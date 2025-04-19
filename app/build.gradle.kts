@@ -40,6 +40,10 @@ android {
 }
 
 dependencies {
+    implementation("com.airbnb.android:lottie-compose:6.2.0")
+
+    implementation (libs.androidx.material.icons.core)
+    implementation (libs.androidx.material.icons.extended)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

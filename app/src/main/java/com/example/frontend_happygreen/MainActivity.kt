@@ -4,44 +4,80 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.example.frontend_happygreen.audio.AudioController
+import com.example.frontend_happygreen.screens.AuthScreen
+import com.example.frontend_happygreen.screens.LoadingScreen
+import com.example.frontend_happygreen.screens.MainScreen
+import com.example.frontend_happygreen.screens.WelcomeScreen
 import com.example.frontend_happygreen.ui.theme.FrontendhappygreenTheme
 
 class MainActivity : ComponentActivity() {
+    private lateinit var audioController: AudioController
+    private var volumeLevel = 0.5f  // Default volume level
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Initialize audio controller
+        audioController = AudioController(this)
+
+        // Start the background music immediately
+        audioController.startBackgroundMusic()
+
         enableEdgeToEdge()
         setContent {
             FrontendhappygreenTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+                // Track volume level state
+                var currentVolumeLevel by remember { mutableFloatStateOf(volumeLevel) }
+
+                HappyGreenApp(
+                    onVolumeChange = { newVolume ->
+                        currentVolumeLevel = newVolume
+                        audioController.setVolume(newVolume)
+                        volumeLevel = newVolume // Save to activity field
+                    },
+                    volumeLevel = currentVolumeLevel
+                )
             }
         }
     }
-}
 
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    FrontendhappygreenTheme {
-        Greeting("Android")
+    override fun onDestroy() {
+        super.onDestroy()
+        audioController.unbind()
     }
+}
+
+@Composable
+fun HappyGreenApp(
+    onVolumeChange: (Float) -> Unit = {},
+    volumeLevel: Float = 0.5f
+) {
+    var currentScreen by remember { mutableStateOf(Screen.Welcome) }
+
+    when (currentScreen) {
+        Screen.Welcome -> WelcomeScreen(
+            onGetStartedClick = { currentScreen = Screen.Auth }
+        )
+        Screen.Auth -> AuthScreen(
+            onAuthComplete = { currentScreen = Screen.Loading }
+        )
+        Screen.Loading -> LoadingScreen(
+            onLoadingComplete = { currentScreen = Screen.Main }
+        )
+        Screen.Main -> MainScreen(
+            volumeLevel = volumeLevel,
+            onVolumeChange = onVolumeChange,
+            onLogout = { currentScreen = Screen.Welcome }
+        )
+    }
+}
+enum class Screen {
+    Welcome, Auth, Loading, Main
 }
