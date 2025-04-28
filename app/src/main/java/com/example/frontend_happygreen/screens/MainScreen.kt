@@ -20,13 +20,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -35,7 +34,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -47,7 +45,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -58,12 +55,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.frontend_happygreen.R
+import com.example.frontend_happygreen.games.EcoDetectiveGameScreen
 import com.example.frontend_happygreen.ui.theme.FrontendhappygreenTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -79,111 +76,273 @@ fun MainScreen(
 
     // State for profile dialog
     var showProfileDialog by remember { mutableStateOf(false) }
-    // Use the passed volumeLevel instead of creating a new one
-    // var volumeLevel by remember { mutableFloatStateOf(0.5f) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        // App Logo
-                        Image(
-                            painter = painterResource(id = R.drawable.happy_green_logo),
-                            contentDescription = "App Logo",
-                            modifier = Modifier.size(32.dp)
-                        )
+    // State for showing game screen
+    var showEcoDetectiveGame by remember { mutableStateOf(false) }
 
-                        Spacer(modifier = Modifier.width(8.dp))
+    // List of available games
+    val gamesList = listOf(
+        Pair("EcoDetective", "Sort waste into the correct bins"),
+        Pair("Green Quiz", "Test your environmental knowledge"),
+        Pair("Tree Planter", "Virtual tree planting simulator")
+    )
 
-                        // App Name
-                        Text(
-                            text = "HappyGreen",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        Spacer(modifier = Modifier.weight(1f))
-
-                        // Profile Picture
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(Color.LightGray)
-                                .border(1.dp, Color.White, CircleShape)
-                                .clickable { showProfileDialog = true }
+    if (showEcoDetectiveGame) {
+        // Show the EcoDetective game screen
+        EcoDetectiveGameScreen(
+            onBack = { showEcoDetectiveGame = false }
+        )
+    } else {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
                         ) {
+                            // App Logo
                             Image(
                                 painter = painterResource(id = R.drawable.happy_green_logo),
-                                contentDescription = "Profile",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
+                                contentDescription = "App Logo",
+                                modifier = Modifier.size(32.dp)
                             )
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            // App Name
+                            Text(
+                                text = "HappyGreen",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            Spacer(modifier = Modifier.weight(1f))
+
+                            // Profile Picture
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.LightGray)
+                                    .border(1.dp, Color.White, CircleShape)
+                                    .clickable { showProfileDialog = true }
+                            ) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.happy_green_logo),
+                                    contentDescription = "Profile",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
                         }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF4CAF50)
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color(0xFF4CAF50)
+                    )
                 )
-            )
-        },
-        bottomBar = {
-            NavigationBar {
-                tabItems.forEachIndexed { index, item ->
-                    NavigationBarItem(
-                        icon = { Icon(icons[index], contentDescription = item) },
-                        label = { Text(item) },
-                        selected = selectedTab == index,
-                        onClick = { selectedTab = index }
+            },
+            bottomBar = {
+                NavigationBar {
+                    tabItems.forEachIndexed { index, item ->
+                        NavigationBarItem(
+                            icon = { Icon(icons[index], contentDescription = item) },
+                            label = { Text(item) },
+                            selected = selectedTab == index,
+                            onClick = { selectedTab = index }
+                        )
+                    }
+                }
+            },
+            floatingActionButton = {
+                FloatingActionButton(
+                    onClick = { /* Add action */ },
+                    containerColor = Color(0xFF4CAF50)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Add",
+                        tint = Color.White
                     )
                 }
             }
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { /* Add action */ },
-                containerColor = Color(0xFF4CAF50)
+        ) { innerPadding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .background(Color.White),
             ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Add",
-                    tint = Color.White
-                )
+                when (selectedTab) {
+                    0 -> HomeContent(
+                        games = gamesList,
+                        onGameSelected = { gameName ->
+                            when (gameName) {
+                                "EcoDetective" -> showEcoDetectiveGame = true
+                                // Add other game cases when implemented
+                            }
+                        }
+                    )
+                    1 -> ProfileContent()
+                    2 -> SettingsContent()
+                }
             }
-        }
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .background(Color.White),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "Main Content",
-                fontSize = 20.sp,
-                color = Color.Gray
-            )
-        }
 
-        // Profile Dialog
-        if (showProfileDialog) {
-            Dialog(onDismissRequest = { showProfileDialog = false }) {
-                ProfileDialog(
-                    volumeLevel = volumeLevel,
-                    onVolumeChange = onVolumeChange, // Use the passed onVolumeChange
-                    onDismiss = { showProfileDialog = false },
-                    onLogout = {
-                        showProfileDialog = false
-                        onLogout()
-                    }
+            // Profile Dialog
+            if (showProfileDialog) {
+                Dialog(onDismissRequest = { showProfileDialog = false }) {
+                    ProfileDialog(
+                        volumeLevel = volumeLevel,
+                        onVolumeChange = onVolumeChange,
+                        onDismiss = { showProfileDialog = false },
+                        onLogout = {
+                            showProfileDialog = false
+                            onLogout()
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun HomeContent(
+    games: List<Pair<String, String>>,
+    onGameSelected: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        // Welcome header
+        Text(
+            text = "Welcome to HappyGreen!",
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF4CAF50)
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "Play eco-friendly games and earn Green Points!",
+            fontSize = 16.sp,
+            color = Color.Gray
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Games section
+        Text(
+            text = "Games",
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Games list
+        games.forEach { (name, description) ->
+            GameCard(
+                name = name,
+                description = description,
+                onClick = { onGameSelected(name) }
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+    }
+}
+
+@Composable
+fun GameCard(
+    name: String,
+    description: String,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 4.dp
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Game icon
+            Box(
+                modifier = Modifier
+                    .size(60.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFFE8F5E9)),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.happy_green_logo),
+                    contentDescription = name,
+                    modifier = Modifier.size(40.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            // Game info
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = name,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Text(
+                    text = description,
+                    fontSize = 14.sp,
+                    color = Color.Gray
                 )
             }
         }
+    }
+}
+
+@Composable
+fun ProfileContent() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "Profile Content",
+            fontSize = 20.sp,
+            color = Color.Gray
+        )
+    }
+}
+
+@Composable
+fun SettingsContent() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "Settings Content",
+            fontSize = 20.sp,
+            color = Color.Gray
+        )
     }
 }
 
@@ -370,6 +529,22 @@ fun ProfileDialogPreview() {
                 onVolumeChange = {},
                 onDismiss = {},
                 onLogout = {}
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun HomeContentPreview() {
+    FrontendhappygreenTheme {
+        Surface {
+            HomeContent(
+                games = listOf(
+                    Pair("EcoDetective", "Sort waste into the correct bins"),
+                    Pair("Green Quiz", "Test your environmental knowledge")
+                ),
+                onGameSelected = {}
             )
         }
     }
