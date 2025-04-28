@@ -11,7 +11,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.Header
 import retrofit2.http.POST
-
+//ciao
 interface OpenAIService {
     @POST("v1/chat/completions")
     suspend fun createChatCompletion(
