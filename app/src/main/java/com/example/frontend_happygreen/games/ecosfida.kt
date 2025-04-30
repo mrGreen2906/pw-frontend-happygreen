@@ -3,18 +3,25 @@ package com.example.frontend_happygreen.games
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -23,17 +30,27 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.frontend_happygreen.R
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
-// Modello dei dati per i rifiuti
+// Colori personalizzati per il tema dell'app
+val EcoGreen = Color(0xFF2E7D32)
+val EcoLightGreen = Color(0xFFAED581)
+val EcoBlue = Color(0xFF1565C0)
+val EcoLightBlue = Color(0xFF81D4FA)
+val EcoBackground = Color(0xFFF5F5F5)
+val EcoError = Color(0xFFD32F2F)
+val EcoSuccess = Color(0xFF388E3C)
+
+// Modello dei dati per i rifiuti con informazioni educative aggiuntive
 data class Waste(
     val id: Int,
     val name: String,
     val imageResId: Int,
     val decompositionTimeYears: Float,
     val pollutionLevel: Int, // da 1 a 10
-    val prevalenceLevel: Int // da 1 a 10, quanto è diffuso sulla Terra
+    val prevalenceLevel: Int, // da 1 a 10, quanto è diffuso sulla Terra
+    val educationalFact: String // Un fatto educativo sul rifiuto
 )
 
 // Enum class per il tipo di domanda
@@ -45,20 +62,143 @@ enum class QuestionType {
 
 // ViewModel per la logica di gioco
 class EcoGameViewModel : ViewModel() {
-    // Database dei rifiuti (in una vera app lo prenderesti da una fonte esterna)
+    // Database dei rifiuti con fatti educativi
     private val wasteDatabase = listOf(
-        Waste(1, "Bottiglia di plastica", R.drawable.placeholder, 450f, 8, 10),
-        Waste(2, "Sacchetto di plastica", R.drawable.placeholder, 20f, 7, 9),
-        Waste(3, "Lattina di alluminio", R.drawable.placeholder, 200f, 6, 8),
-        Waste(4, "Buccia di banana", R.drawable.placeholder, 0.1f, 1, 5),
-        Waste(5, "Mozzicone di sigaretta", R.drawable.placeholder, 5f, 9, 10),
-        Waste(6, "Pannolino usa e getta", R.drawable.placeholder, 500f, 7, 8),
-        Waste(7, "Giornale", R.drawable.placeholder, 0.2f, 2, 6),
-        Waste(8, "Bicchiere di carta", R.drawable.placeholder, 0.1f, 3, 7),
-        Waste(9, "Bottiglia di vetro", R.drawable.placeholder, 1000f, 4, 7),
-        Waste(10, "Gomma da masticare", R.drawable.placeholder, 5f, 7, 9),
-        Waste(11, "Apparecchio elettronico", R.drawable.placeholder, 1000f, 10, 8),
-        Waste(12, "Batteria", R.drawable.placeholder, 100f, 10, 7)
+        Waste(
+            1,
+            "Bottiglia di plastica",
+            R.drawable.placeholder,
+            450f,
+            8,
+            10,
+            "Le bottiglie di plastica impiegano centinaia di anni per decomporsi e rilasciano microplastiche nell'ambiente."
+        ),
+        Waste(
+            2,
+            "Sacchetto di plastica",
+            R.drawable.placeholder,
+            20f,
+            7,
+            9,
+            "I sacchetti di plastica uccidono migliaia di animali marini ogni anno che li scambiano per cibo."
+        ),
+        Waste(
+            3,
+            "Lattina di alluminio",
+            R.drawable.placeholder,
+            200f,
+            6,
+            8,
+            "Il riciclaggio dell'alluminio richiede solo il 5% dell'energia necessaria per produrlo da zero."
+        ),
+        Waste(
+            4,
+            "Buccia di banana",
+            R.drawable.placeholder,
+            0.1f,
+            1,
+            5,
+            "Le bucce di banana sono biodegradabili e possono essere usate per il compostaggio."
+        ),
+        Waste(
+            5,
+            "Mozzicone di sigaretta",
+            R.drawable.placeholder,
+            5f,
+            9,
+            10,
+            "I mozziconi di sigaretta sono il rifiuto più comune al mondo e contengono plastiche e sostanze tossiche."
+        ),
+        Waste(
+            6,
+            "Pannolino usa e getta",
+            R.drawable.placeholder,
+            500f,
+            7,
+            8,
+            "Un bambino usa in media 6.000 pannolini prima di imparare a usare il bagno."
+        ),
+        Waste(
+            7,
+            "Giornale",
+            R.drawable.placeholder,
+            0.2f,
+            2,
+            6,
+            "La carta può essere riciclata fino a 7 volte prima che le fibre diventino troppo corte."
+        ),
+        Waste(
+            8,
+            "Bicchiere di carta",
+            R.drawable.placeholder,
+            0.1f,
+            3,
+            7,
+            "Molti bicchieri di carta hanno un rivestimento in plastica che li rende difficili da riciclare."
+        ),
+        Waste(
+            9,
+            "Bottiglia di vetro",
+            R.drawable.placeholder,
+            1000f,
+            4,
+            7,
+            "Il vetro può essere riciclato infinite volte senza perdere qualità o purezza."
+        ),
+        Waste(
+            10,
+            "Gomma da masticare",
+            R.drawable.placeholder,
+            5f,
+            7,
+            9,
+            "La gomma da masticare è fatta di polimeri sintetici simili alla plastica e non è biodegradabile."
+        ),
+        Waste(
+            11,
+            "Apparecchio elettronico",
+            R.drawable.placeholder,
+            1000f,
+            10,
+            8,
+            "I rifiuti elettronici contengono metalli pesanti tossici che possono contaminare suolo e acqua."
+        ),
+        Waste(
+            12,
+            "Batteria",
+            R.drawable.placeholder,
+            100f,
+            10,
+            7,
+            "Una singola batteria può contaminare 600.000 litri di acqua se smaltita in discarica."
+        ),
+        Waste(
+            13,
+            "Mascherina monouso",
+            R.drawable.placeholder,
+            450f,
+            7,
+            9,
+            "Durante la pandemia, miliardi di mascherine sono finite negli oceani, causando problemi alla fauna marina."
+        ),
+        Waste(
+            14,
+            "Carta stagnola",
+            R.drawable.placeholder,
+            400f,
+            5,
+            8,
+            "La carta stagnola può essere riciclata ma deve essere pulita dai residui di cibo."
+        ),
+        Waste(
+            15,
+            "Scontrino fiscale",
+            R.drawable.placeholder,
+            0.1f,
+            6,
+            9,
+            "Molti scontrini contengono BPA e non possono essere riciclati con la carta normale."
+        )
     )
 
     // Stato del gioco
@@ -80,6 +220,14 @@ class EcoGameViewModel : ViewModel() {
     private var _gameOver = mutableStateOf(false)
     val gameOver: State<Boolean> = _gameOver
 
+    // Motivo della sconfitta
+    private var _gameOverReason = mutableStateOf("")
+    val gameOverReason: State<String> = _gameOverReason
+
+    // Livello attuale (aumenta la difficoltà)
+    private var _currentLevel = mutableStateOf(1)
+    val currentLevel: State<Int> = _currentLevel
+
     // Per mostrare il risultato della scelta
     private var _showResult = mutableStateOf(false)
     val showResult: State<Boolean> = _showResult
@@ -87,20 +235,63 @@ class EcoGameViewModel : ViewModel() {
     private var _lastChoiceCorrect = mutableStateOf(false)
     val lastChoiceCorrect: State<Boolean> = _lastChoiceCorrect
 
+    // Per tenere traccia dei rifiuti già utilizzati in questa partita
+    private val usedWasteIds = mutableSetOf<Int>()
+
+    // Stato per la modalità tutorial
+    private var _showTutorial = mutableStateOf(true)
+    val showTutorial: State<Boolean> = _showTutorial
+
+    // Combo streak per bonus punti
+    private var _comboStreak = mutableStateOf(0)
+    val comboStreak: State<Int> = _comboStreak
+
+    // Tempo rimanente per rispondere
+    private var _timeRemaining = mutableStateOf(15)
+    val timeRemaining: State<Int> = _timeRemaining
+
+    // Flag per indicare se il timer è attivo
+    private var _timerActive = mutableStateOf(false)
+    val timerActive: State<Boolean> = _timerActive
+
     init {
         startNewRound()
     }
 
     // Inizia un nuovo round
     fun startNewRound() {
-        // Seleziona due rifiuti diversi casualmente
-        var left = wasteDatabase.random()
-        var right = wasteDatabase.random()
-
-        // Assicurati che siano diversi
-        while (left.id == right.id) {
-            right = wasteDatabase.random()
+        // Dopo 10 punti, passa al livello 2 (tempo ridotto)
+        if (currentScore.value >= 10 && _currentLevel.value == 1) {
+            _currentLevel.value = 2
         }
+        // Dopo 20 punti, passa al livello 3 (tempo ulteriormente ridotto)
+        else if (currentScore.value >= 20 && _currentLevel.value == 2) {
+            _currentLevel.value = 3
+        }
+
+        // Reset del timer in base al livello
+        _timeRemaining.value = when(_currentLevel.value) {
+            1 -> 15
+            2 -> 10
+            else -> 7
+        }
+
+        // Seleziona due rifiuti diversi casualmente che non sono stati usati di recente
+        var availableWastes = wasteDatabase.filter { it.id !in usedWasteIds }
+
+        // Se abbiamo esaurito i rifiuti disponibili, resettiamo la lista
+        if (availableWastes.size < 2) {
+            usedWasteIds.clear()
+            availableWastes = wasteDatabase
+        }
+
+        val left = availableWastes.random()
+        usedWasteIds.add(left.id)
+
+        // Seleziona un secondo rifiuto diverso dal primo
+        availableWastes = availableWastes.filter { it.id != left.id }
+        val right = availableWastes.random()
+        usedWasteIds.add(right.id)
 
         _leftWaste.value = left
         _rightWaste.value = right
@@ -109,19 +300,37 @@ class EcoGameViewModel : ViewModel() {
         _currentQuestion.value = QuestionType.values().random()
 
         _showResult.value = false
+        _timerActive.value = true
     }
 
     // Gestisce la selezione dell'utente
     fun makeSelection(selectedLeft: Boolean) {
+        _timerActive.value = false
+
         val correct = isCorrectAnswer(selectedLeft)
 
         _lastChoiceCorrect.value = correct
         _showResult.value = true
 
         if (correct) {
-            // Aumenta il punteggio se la risposta è corretta
-            _currentScore.value += 1
+            // Aumenta il combo streak
+            _comboStreak.value += 1
+
+            // Calcola i punti bonus in base al combo streak
+            val comboBonus = minOf(_comboStreak.value / 3, 3) // Massimo 3 punti bonus
+
+            // Aumenta il punteggio se la risposta è corretta (1 punto base + bonus combo + bonus tempo)
+            val timeBonus = (_timeRemaining.value / 5) // Bonus tempo: max 3 punti
+            val totalPoints = 1 + comboBonus + timeBonus
+
+            _currentScore.value += totalPoints
         } else {
+            // Resetta il combo streak
+            _comboStreak.value = 0
+
+            // Imposta il motivo della sconfitta
+            setGameOverReason()
+
             // Aggiorna il record se necessario
             if (_currentScore.value > _highScore.value) {
                 _highScore.value = _currentScore.value
@@ -151,6 +360,46 @@ class EcoGameViewModel : ViewModel() {
         }
     }
 
+    // Imposta il motivo della sconfitta
+    private fun setGameOverReason() {
+        val left = _leftWaste.value
+        val right = _rightWaste.value
+
+        if (left == null || right == null) {
+            _gameOverReason.value = "Errore imprevisto."
+            return
+        }
+
+        when (_currentQuestion.value) {
+            QuestionType.DECOMPOSITION_TIME -> {
+                val correct = if (left.decompositionTimeYears > right.decompositionTimeYears) left else right
+                val incorrect = if (correct == left) right else left
+                val correctYears = if (correct.decompositionTimeYears < 1)
+                    "${(correct.decompositionTimeYears * 12).toInt()} mesi"
+                else
+                    "${correct.decompositionTimeYears} anni"
+                val incorrectYears = if (incorrect.decompositionTimeYears < 1)
+                    "${(incorrect.decompositionTimeYears * 12).toInt()} mesi"
+                else
+                    "${incorrect.decompositionTimeYears} anni"
+
+                _gameOverReason.value = "${correct.name} impiega $correctYears a decomporsi, mentre ${incorrect.name} solo $incorrectYears."
+            }
+            QuestionType.POLLUTION_LEVEL -> {
+                val correct = if (left.pollutionLevel > right.pollutionLevel) left else right
+                val incorrect = if (correct == left) right else left
+
+                _gameOverReason.value = "${correct.name} ha un livello di inquinamento di ${correct.pollutionLevel}/10, mentre ${incorrect.name} di ${incorrect.pollutionLevel}/10."
+            }
+            QuestionType.PREVALENCE_LEVEL -> {
+                val correct = if (left.prevalenceLevel > right.prevalenceLevel) left else right
+                val incorrect = if (correct == left) right else left
+
+                _gameOverReason.value = "${correct.name} ha un livello di presenza sulla Terra di ${correct.prevalenceLevel}/10, mentre ${incorrect.name} di ${incorrect.prevalenceLevel}/10."
+            }
+        }
+    }
+
     // Continua al prossimo round
     fun continueGame() {
         startNewRound()
@@ -160,7 +409,35 @@ class EcoGameViewModel : ViewModel() {
     fun resetGame() {
         _currentScore.value = 0
         _gameOver.value = false
+        _currentLevel.value = 1
+        _comboStreak.value = 0
+        usedWasteIds.clear()
         startNewRound()
+    }
+
+    // Chiude il tutorial
+    fun dismissTutorial() {
+        _showTutorial.value = false
+    }
+
+    // Aggiorna il timer
+    fun updateTimer() {
+        if (_timerActive.value && _timeRemaining.value > 0) {
+            _timeRemaining.value -= 1
+
+            // Tempo scaduto
+            if (_timeRemaining.value == 0) {
+                _timerActive.value = false
+                // Termina il gioco se il tempo scade
+                if (_currentScore.value > _highScore.value) {
+                    _highScore.value = _currentScore.value
+                }
+                _gameOverReason.value = "Tempo scaduto! Devi rispondere più velocemente."
+                _gameOver.value = true
+                _showResult.value = true
+                _lastChoiceCorrect.value = false
+            }
+        }
     }
 
     // Ottieni il testo della domanda corrente
@@ -204,15 +481,105 @@ class EcoGameViewModel : ViewModel() {
             QuestionType.PREVALENCE_LEVEL -> "${correctWaste.prevalenceLevel}/10"
         }
 
-        return "${correctWaste.name}: $value"
+        return "Risposta: ${correctWaste.name} - $value"
+    }
+
+    // Ottieni il dettaglio delle statistiche di entrambi gli oggetti
+    fun getDetailedComparison(): String {
+        val left = _leftWaste.value
+        val right = _rightWaste.value
+
+        if (left == null || right == null) return ""
+
+        return when (_currentQuestion.value) {
+            QuestionType.DECOMPOSITION_TIME -> {
+                val leftTime = if (left.decompositionTimeYears < 1)
+                    "${(left.decompositionTimeYears * 12).toInt()} mesi"
+                else
+                    "${left.decompositionTimeYears} anni"
+                val rightTime = if (right.decompositionTimeYears < 1)
+                    "${(right.decompositionTimeYears * 12).toInt()} mesi"
+                else
+                    "${right.decompositionTimeYears} anni"
+
+                "${left.name}: $leftTime vs ${right.name}: $rightTime"
+            }
+            QuestionType.POLLUTION_LEVEL -> {
+                "${left.name}: ${left.pollutionLevel}/10 vs ${right.name}: ${right.pollutionLevel}/10\n" +
+                        "La scala va da 1 (impatto minimo) a 10 (massimo impatto ambientale)"
+            }
+            QuestionType.PREVALENCE_LEVEL -> {
+                // Convertire i livelli di prevalenza in stime reali
+                val leftEstimate = when(left.prevalenceLevel) {
+                    10 -> "Oltre 500 miliardi"
+                    9 -> "100-500 miliardi"
+                    8 -> "50-100 miliardi"
+                    7 -> "10-50 miliardi"
+                    6 -> "1-10 miliardi"
+                    5 -> "500 milioni-1 miliardo"
+                    4 -> "100-500 milioni"
+                    3 -> "10-100 milioni"
+                    2 -> "1-10 milioni"
+                    else -> "Meno di 1 milione"
+                }
+
+                val rightEstimate = when(right.prevalenceLevel) {
+                    10 -> "Oltre 500 miliardi"
+                    9 -> "100-500 miliardi"
+                    8 -> "50-100 miliardi"
+                    7 -> "10-50 miliardi"
+                    6 -> "1-10 miliardi"
+                    5 -> "500 milioni-1 miliardo"
+                    4 -> "100-500 milioni"
+                    3 -> "10-100 milioni"
+                    2 -> "1-10 milioni"
+                    else -> "Meno di 1 milione"
+                }
+
+                "${left.name}: ~$leftEstimate unità (${left.prevalenceLevel}/10)\n" +
+                        "${right.name}: ~$rightEstimate unità (${right.prevalenceLevel}/10)"
+            }
+        }
+    }
+
+    // Ottieni il fatto educativo sul rifiuto corretto
+    fun getEducationalFact(): String {
+        val left = _leftWaste.value
+        val right = _rightWaste.value
+
+        if (left == null || right == null) return ""
+
+        return when (_currentQuestion.value) {
+            QuestionType.DECOMPOSITION_TIME -> {
+                if (left.decompositionTimeYears > right.decompositionTimeYears) left.educationalFact else right.educationalFact
+            }
+            QuestionType.POLLUTION_LEVEL -> {
+                if (left.pollutionLevel > right.pollutionLevel) left.educationalFact else right.educationalFact
+            }
+            QuestionType.PREVALENCE_LEVEL -> {
+                if (left.prevalenceLevel > right.prevalenceLevel) left.educationalFact else right.educationalFact
+            }
+        }
     }
 }
+
+// Aggiungi questa chiusura mancante alla fine del file
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
+            MaterialTheme(
+                colorScheme = darkColorScheme(
+                    primary = EcoGreen,
+                    primaryContainer = EcoLightGreen,
+                    secondary = EcoBlue,
+                    secondaryContainer = EcoLightBlue,
+                    background = EcoBackground,
+                    error = EcoError
+                )
+            ) {
                 EcoGameScreen()
             }
         }
@@ -230,6 +597,23 @@ fun EcoGameScreen(viewModel: EcoGameViewModel = viewModel()) {
     val showResult by viewModel.showResult
     val lastChoiceCorrect by viewModel.lastChoiceCorrect
     val currentQuestion = viewModel.getCurrentQuestionText()
+    val currentLevel by viewModel.currentLevel
+    val comboStreak by viewModel.comboStreak
+    val timeRemaining by viewModel.timeRemaining
+    val timerActive by viewModel.timerActive
+    val showTutorial by viewModel.showTutorial
+
+    // Per gestire l'uscita dall'app
+    val context = LocalContext.current
+    val activity = (context as? ComponentActivity)
+
+    // Timer
+    LaunchedEffect(timerActive) {
+        while (timerActive) {
+            delay(1000L)
+            viewModel.updateTimer()
+        }
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -237,81 +621,63 @@ fun EcoGameScreen(viewModel: EcoGameViewModel = viewModel()) {
     ) {
         if (gameOver) {
             GameOverScreen(
-                currentScore = currentScore,
-                highScore = highScore,
-                onRestart = { viewModel.resetGame() }
+                score = currentScore,
+                onRestart = { viewModel.resetGame() },
+                onBack = { activity?.finish() },
             )
         } else {
-            Column(modifier = Modifier.fillMaxSize()) {
-                // Barra superiore con informazioni sul punteggio
-                TopBar(currentScore, highScore)
+            Box(modifier = Modifier.fillMaxSize()) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    // Barra superiore con informazioni sul punteggio
+                    TopBar(currentScore, highScore, currentLevel, comboStreak, timeRemaining)
 
-                // Domanda attuale
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.primaryContainer)
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = currentQuestion,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        textAlign = TextAlign.Center
-                    )
-                }
+                    // Domanda attuale
+                    QuestionHeader(currentQuestion)
 
-                // Area di gioco principale
-                Row(modifier = Modifier.weight(1f)) {
-                    // Lato sinistro
-                    WasteCard(
-                        waste = leftWaste,
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(8.dp)
-                            .background(Color(0xFFE8F5E9), RoundedCornerShape(12.dp))
-                            .border(2.dp, Color(0xFF388E3C), RoundedCornerShape(12.dp)),
-                        onClick = { viewModel.makeSelection(true) },
-                        enabled = !showResult
-                    )
+                    // Area di gioco principale
+                    Row(modifier = Modifier.weight(1f)) {
+                        // Lato sinistro
+                        WasteCard(
+                            waste = leftWaste,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(8.dp),
+                            cardColor = EcoLightGreen,
+                            borderColor = EcoGreen,
+                            onClick = { viewModel.makeSelection(true) },
+                            enabled = !showResult && !showTutorial
+                        )
 
-                    // Lato destro
-                    WasteCard(
-                        waste = rightWaste,
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(8.dp)
-                            .background(Color(0xFFE3F2FD), RoundedCornerShape(12.dp))
-                            .border(2.dp, Color(0xFF1976D2), RoundedCornerShape(12.dp)),
-                        onClick = { viewModel.makeSelection(false) },
-                        enabled = !showResult
-                    )
-                }
-
-                // Area per i risultati e pulsante continua
-                if (showResult) {
-                    ResultSection(
-                        correct = lastChoiceCorrect,
-                        correctAnswerText = viewModel.getCorrectAnswerText(),
-                        onContinue = { viewModel.continueGame() }
-                    )
-                } else {
-                    // Indicazioni all'utente
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.surface)
-                            .padding(8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "Tocca l'oggetto che pensi sia la risposta corretta!",
-                            fontSize = 16.sp,
-                            textAlign = TextAlign.Center
+                        // Lato destro
+                        WasteCard(
+                            waste = rightWaste,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(8.dp),
+                            cardColor = EcoLightBlue,
+                            borderColor = EcoBlue,
+                            onClick = { viewModel.makeSelection(false) },
+                            enabled = !showResult && !showTutorial
                         )
                     }
+
+                    // Area per i risultati e pulsante continua
+                    if (showResult) {
+                        ResultSection(
+                            correct = lastChoiceCorrect,
+                            correctAnswerText = viewModel.getCorrectAnswerText(),
+                            educationalFact = viewModel.getEducationalFact(),
+                            onContinue = { viewModel.continueGame() }
+                        )
+                    } else if (!showTutorial) {
+                        // Indicazioni all'utente
+                        InstructionFooter()
+                    }
+                }
+
+                // Mostra il tutorial se necessario
+                if (showTutorial) {
+                    TutorialOverlay(onDismiss = { viewModel.dismissTutorial() })
                 }
             }
         }
@@ -319,25 +685,125 @@ fun EcoGameScreen(viewModel: EcoGameViewModel = viewModel()) {
 }
 
 @Composable
-fun TopBar(currentScore: Int, highScore: Int) {
-    Row(
+fun TopBar(currentScore: Int, highScore: Int, currentLevel: Int, comboStreak: Int, timeRemaining: Int) {
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.primary)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Punteggio: $currentScore",
+                color = Color.White,
+                fontWeight = FontWeight.Bold
+            )
+
+            Text(
+                text = "Record: $highScore",
+                color = Color.White,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Livello
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Livello: $currentLevel",
+                    color = Color.White,
+                    fontSize = 14.sp
+                )
+            }
+
+            // Combo
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (comboStreak >= 3) {
+                    val infiniteTransition = rememberInfiniteTransition()
+                    val scale by infiniteTransition.animateFloat(
+                        initialValue = 1f,
+                        targetValue = 1.2f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(500),
+                            repeatMode = RepeatMode.Reverse
+                        )
+                    )
+
+                    Text(
+                        text = "Combo: $comboStreak",
+                        color = Color.Yellow,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        modifier = Modifier.graphicsLayer(scaleX = scale, scaleY = scale)
+                    )
+                } else {
+                    Text(
+                        text = "Combo: $comboStreak",
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
+                }
+            }
+
+            // Timer
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val timerColor = when {
+                    timeRemaining <= 3 -> Color.Red
+                    timeRemaining <= 7 -> Color.Yellow
+                    else -> Color.White
+                }
+
+                Text(
+                    text = "Tempo: $timeRemaining",
+                    color = timerColor,
+                    fontWeight = if (timeRemaining <= 5) FontWeight.Bold else FontWeight.Normal,
+                    fontSize = 14.sp
+                )
+            }
+        }
+
+        // Barra del tempo
+        LinearProgressIndicator(
+            progress = timeRemaining / 15f,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp),
+            color = when {
+                timeRemaining <= 3 -> Color.Red
+                timeRemaining <= 7 -> Color.Yellow
+                else -> Color.White
+            },
+            trackColor = Color.DarkGray
+        )
+    }
+}
+
+@Composable
+fun QuestionHeader(question: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.primaryContainer)
             .padding(16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        contentAlignment = Alignment.Center
     ) {
         Text(
-            text = "Punteggio: $currentScore",
-            color = Color.White,
-            fontWeight = FontWeight.Bold
-        )
-
-        Text(
-            text = "Record: $highScore",
-            color = Color.White,
-            fontWeight = FontWeight.Bold
+            text = question,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            textAlign = TextAlign.Center
         )
     }
 }
@@ -346,11 +812,24 @@ fun TopBar(currentScore: Int, highScore: Int) {
 fun WasteCard(
     waste: Waste?,
     modifier: Modifier = Modifier,
+    cardColor: Color,
+    borderColor: Color,
     onClick: () -> Unit,
     enabled: Boolean = true
 ) {
+    val cardElevation by animateDpAsState(
+        targetValue = if (enabled) 4.dp else 0.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        )
+    )
+
     Box(
         modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(cardColor)
+            .border(3.dp, borderColor, RoundedCornerShape(16.dp))
             .clickable(enabled = enabled) { onClick() }
             .padding(16.dp),
         contentAlignment = Alignment.Center
@@ -360,15 +839,21 @@ fun WasteCard(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Immagine del rifiuto
-                Image(
-                    painter = painterResource(id = it.imageResId),
-                    contentDescription = it.name,
+                // Immagine del rifiuto con ombra
+                Surface(
                     modifier = Modifier
                         .size(160.dp)
                         .padding(8.dp),
-                    contentScale = ContentScale.Fit
-                )
+                    shape = RoundedCornerShape(8.dp),
+                    shadowElevation = cardElevation
+                ) {
+                    Image(
+                        painter = painterResource(id = it.imageResId),
+                        contentDescription = it.name,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.padding(8.dp)
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -377,7 +862,8 @@ fun WasteCard(
                     text = it.name,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    color = Color.Black
                 )
             }
         }
@@ -385,11 +871,20 @@ fun WasteCard(
 }
 
 @Composable
-fun ResultSection(correct: Boolean, correctAnswerText: String, onContinue: () -> Unit) {
+fun ResultSection(
+    correct: Boolean,
+    correctAnswerText: String,
+    educationalFact: String,
+    onContinue: () -> Unit
+) {
+    val backgroundColor = if (correct) Color(0xFFDCEDC8) else Color(0xFFFFCDD2)
+    val textColor = if (correct) Color(0xFF33691E) else Color(0xFFB71C1C)
+    val viewModel: EcoGameViewModel = viewModel()
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(if (correct) Color(0xFFDCEDC8) else Color(0xFFFFCDD2))
+            .background(backgroundColor)
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -397,7 +892,7 @@ fun ResultSection(correct: Boolean, correctAnswerText: String, onContinue: () ->
             text = if (correct) "Corretto!" else "Sbagliato!",
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
-            color = if (correct) Color(0xFF33691E) else Color(0xFFB71C1C)
+            color = textColor
         )
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -405,8 +900,55 @@ fun ResultSection(correct: Boolean, correctAnswerText: String, onContinue: () ->
         Text(
             text = correctAnswerText,
             fontSize = 18.sp,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            color = Color.DarkGray
         )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Mostra la comparazione dettagliata
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            shape = RoundedCornerShape(8.dp),
+            color = Color(0xFFEEEEEE)
+        ) {
+            Text(
+                text = viewModel.getDetailedComparison(),
+                fontSize = 14.sp,
+                color = Color.DarkGray,
+                modifier = Modifier.padding(12.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Fatto educativo
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            shape = RoundedCornerShape(8.dp),
+            color = Color(0xFFEEEEEE)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = "Lo sapevi?",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = Color.Black
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = educationalFact,
+                    fontSize = 14.sp,
+                    color = Color.DarkGray
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -415,59 +957,125 @@ fun ResultSection(correct: Boolean, correctAnswerText: String, onContinue: () ->
                 onClick = onContinue,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary
-                )
+                ),
+                shape = RoundedCornerShape(24.dp)
             ) {
-                Text("Continua", fontSize = 18.sp)
+                Text("Continua", fontSize = 18.sp, modifier = Modifier.padding(horizontal = 8.dp))
             }
         }
     }
 }
 
 @Composable
-fun GameOverScreen(currentScore: Int, highScore: Int, onRestart: () -> Unit) {
-    Column(
+fun InstructionFooter() {
+    Box(
         modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(8.dp),
+        contentAlignment = Alignment.Center
     ) {
         Text(
-            text = "Game Over!",
-            fontSize = 32.sp,
-            fontWeight = FontWeight.Bold
+            text = "Tocca l'oggetto che pensi sia la risposta corretta!",
+            fontSize = 16.sp,
+            textAlign = TextAlign.Center,
+            color = Color.DarkGray
         )
+    }
+}
 
-        Spacer(modifier = Modifier.height(32.dp))
+@Composable
+fun TutorialOverlay(onDismiss: () -> Unit) {
+    val coroutineScope = rememberCoroutineScope()
+    var currentStep by remember { mutableStateOf(1) }
+    val totalSteps = 3
 
-        Text(
-            text = "Il tuo punteggio: $currentScore",
-            fontSize = 24.sp
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        if (currentScore >= highScore && highScore > 0) {
-            Text(
-                text = "Nuovo Record!",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-        } else {
-            Text(
-                text = "Record attuale: $highScore",
-                fontSize = 20.sp
-            )
-        }
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Button(
-            onClick = onRestart,
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0x99000000))
+            .clickable {
+                if (currentStep < totalSteps) {
+                    currentStep++
+                } else {
+                    onDismiss()
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            modifier = Modifier
+                .widthIn(max = 320.dp)
+                .padding(24.dp),
+            shape = RoundedCornerShape(16.dp),
+            color = Color.White
         ) {
-            Text("Gioca ancora", fontSize = 18.sp)
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = when(currentStep) {
+                        1 -> "Benvenuto a EcoGame!"
+                        2 -> "Come si gioca"
+                        else -> "Consigli finali"
+                    },
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = EcoGreen
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = when(currentStep) {
+                        1 -> "Questo gioco ti aiuterà a imparare l'impatto ambientale dei rifiuti in modo divertente! Ad ogni turno dovrai scegliere tra due oggetti in base alla domanda."
+                        2 -> "Rispondi prima che scada il tempo. Più veloce sei, più punti guadagnerai! Risposte corrette consecutive ti daranno un bonus combo."
+                        else -> "Ricorda: Livelli più alti = meno tempo. Impara dai fatti educativi per aumentare la tua conoscenza sull'ambiente!"
+                    },
+                    fontSize = 16.sp,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    // Indicatori di step
+                    for (i in 1..totalSteps) {
+                        Box(
+                            modifier = Modifier
+                                .size(12.dp)
+                                .clip(CircleShape)
+                                .background(if (i <= currentStep) EcoGreen else Color.LightGray)
+                                .padding(4.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = {
+                        if (currentStep < totalSteps) {
+                            currentStep++
+                        } else {
+                            onDismiss()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = EcoGreen),
+                    shape = RoundedCornerShape(24.dp)
+                ) {
+                    Text(
+                        text = if (currentStep < totalSteps) "Continua" else "Inizia a giocare",
+                        fontSize = 16.sp,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                }
+            }
         }
     }
 }
