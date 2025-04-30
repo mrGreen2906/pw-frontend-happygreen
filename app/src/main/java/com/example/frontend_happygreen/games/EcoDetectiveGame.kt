@@ -1,696 +1,362 @@
-// EcoDetectiveGame.kt
 package com.example.frontend_happygreen.games
 
-import android.util.Log
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.zIndex
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
-import com.example.frontend_happygreen.R
-import com.example.frontend_happygreen.ui.theme.FrontendhappygreenTheme
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.json.JSONObject
-import java.net.URL
+import com.example.frontend_happygreen.R
+import androidx.compose.ui.unit.IntOffset
+enum class WasteType { PLASTIC, PAPER, ORGANIC, GLASS }
 
-// Definizione dei tipi di rifiuti e bidoni
-enum class WasteType {
-    PLASTIC,
-    PAPER,
-    GLASS,
-    ORGANIC,
-    MIXED
-}
+data class WasteItem(val name: String, val imageRes: Int, val type: WasteType)
 
-// Definizione di un item di rifiuto
-data class WasteItem(
-    val id: Int,
-    val name: String,
-    val imageUrl: String, // URL for the image from API
-    val type: WasteType,
-    var position: MutableState<Offset> = mutableStateOf(Offset.Zero),
-    var isDragging: MutableState<Boolean> = mutableStateOf(false),
-    var isCollected: MutableState<Boolean> = mutableStateOf(false)
-)
+data class BinBounds(val type: WasteType, val bounds: Rect)
 
-// Definizione di un bidone
-data class TrashBin(
-    val id: Int,
-    val name: String,
-    val iconRes: Int,
-    val color: Color,
-    val type: WasteType,
-    val position: Offset = Offset.Zero
-)
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EcoDetectiveGameScreen(
-    onBack: () -> Unit = {}
-) {
-    val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    var score by remember { mutableStateOf(0) }
-    var lives by remember { mutableStateOf(3) }
-    var gameActive by remember { mutableStateOf(true) }
-    var gameOver by remember { mutableStateOf(false) }
-    var showSuccessDialog by remember { mutableStateOf(false) }
-    var showErrorDialog by remember { mutableStateOf(false) }
-    var currentItemIndex by remember { mutableStateOf(0) } // Track current item index
-    var isLoading by remember { mutableStateOf(true) }
-    val totalItems = 10 // Total number of items in the game
-
-    // Google Custom Search API configuration
-    val apiKey = "AIzaSyBgTWP_2E3NEHcGtNDAf89269Ic8AbJI-8"
-    val searchEngineId = "54671b1c3db084e4a" // Replace with your actual Search Engine ID
-    val numResults = 1
-
-    // Search terms for different waste types
-    val searchQueries = mapOf(
-        WasteType.PLASTIC to listOf("plastic bottle waste", "plastic bag trash", "plastic container recycling"),
-        WasteType.PAPER to listOf("paper waste", "cardboard recycling", "newspaper waste"),
-        WasteType.GLASS to listOf("glass bottle waste", "glass jar recycling", "glass waste"),
-        WasteType.ORGANIC to listOf("food waste", "organic waste", "compost material"),
-        WasteType.MIXED to listOf("mixed waste", "general waste", "non-recyclable waste")
+fun EcoDetectiveGameScreen(onBack: () -> Unit) {
+    val allItems = listOf(
+        WasteItem("Bottiglia di vetro", R.drawable.placeholder, WasteType.GLASS),
+        WasteItem("Bottiglia di plastica", R.drawable.placeholder, WasteType.PLASTIC),
+        WasteItem("Giornale", R.drawable.placeholder, WasteType.PAPER),
+        WasteItem("Mela", R.drawable.placeholder, WasteType.ORGANIC)
     )
 
-    // Define trash bins
-    val trashBins = remember {
-        listOf(
-            TrashBin(
-                id = 1,
-                name = "Plastica",
-                iconRes = R.drawable.happy_green_logo, // Replace with proper icon
-                color = Color(0xFFFFEB3B),
-                type = WasteType.PLASTIC
-            ),
-            TrashBin(
-                id = 2,
-                name = "Carta",
-                iconRes = R.drawable.happy_green_logo, // Replace with proper icon
-                color = Color(0xFF2196F3),
-                type = WasteType.PAPER
-            ),
-            TrashBin(
-                id = 3,
-                name = "Vetro",
-                iconRes = R.drawable.happy_green_logo, // Replace with proper icon
-                color = Color(0xFF4CAF50),
-                type = WasteType.GLASS
-            ),
-            TrashBin(
-                id = 4,
-                name = "Organico",
-                iconRes = R.drawable.happy_green_logo, // Replace with proper icon
-                color = Color(0xFF795548),
-                type = WasteType.ORGANIC
-            ),
-            TrashBin(
-                id = 5,
-                name = "Indifferenziato",
-                iconRes = R.drawable.happy_green_logo, // Replace with proper icon
-                color = Color(0xFF9E9E9E),
-                type = WasteType.MIXED
-            )
-        )
-    }
+    var currentItem by remember { mutableStateOf(allItems.random()) }
+    var itemOffset by remember { mutableStateOf(Offset.Zero) }
+    val animatedOffset = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
+    var score by remember { mutableStateOf(0) }
+    var lives by remember { mutableStateOf(3) }
+    var timeLeft by remember { mutableStateOf(60) }
+    var isDragging by remember { mutableStateOf(false) }
 
-    // Master list of all waste items in the game
-    val allWasteItems = remember { mutableStateListOf<WasteItem>() }
+    // Store the bounds of each bin for collision detection
+    var binsBounds by remember { mutableStateOf<List<BinBounds>>(emptyList()) }
+    // Store the current item bounds
+    var itemBounds by remember { mutableStateOf<Rect?>(null) }
+    var itemInitialCenter by remember { mutableStateOf(Offset.Zero) }
 
-    // Currently active waste item (only one shown at a time)
-    var currentWasteItem by remember { mutableStateOf<WasteItem?>(null) }
+    // For visual debugging of drop zones (can be removed in production)
+    var lastDropResult by remember { mutableStateOf<Pair<Boolean, WasteType?>>(Pair(false, null)) }
 
-    // Function to search for images using Google Custom Search API
-    suspend fun searchForImage(query: String): String {
-        return withContext(Dispatchers.IO) {
-            try {
-                val url = "https://www.googleapis.com/customsearch/v1?key=$apiKey&cx=$searchEngineId&q=$query&searchType=image&num=$numResults"
-                val response = URL(url).readText()
-                val jsonObject = JSONObject(response)
-                val items = jsonObject.getJSONArray("items")
+    val scope = rememberCoroutineScope()
 
-                if (items.length() > 0) {
-                    val item = items.getJSONObject(0)
-                    item.getString("link")
-                } else {
-                    // Fallback to a placeholder if no image is found
-                    "https://via.placeholder.com/150?text=Waste"
-                }
-            } catch (e: Exception) {
-                Log.e("EcoDetectiveGame", "Error fetching image: ${e.message}")
-                // Return a placeholder image URL in case of error
-                "https://via.placeholder.com/150?text=Error"
-            }
+    // Timer countdown
+    LaunchedEffect(key1 = timeLeft) {
+        if (timeLeft > 0 && lives > 0) {
+            delay(1000)
+            timeLeft--
         }
     }
 
-    // Load images and generate waste items
-    LaunchedEffect(Unit) {
-        isLoading = true
-        allWasteItems.clear()
+    // Reset game on fail
+    fun resetPosition() {
+        scope.launch {
+            animatedOffset.animateTo(Offset.Zero, tween(300))
+            itemOffset = Offset.Zero
+        }
+    }
 
-        val wasteNamesByType = mapOf(
-            WasteType.PLASTIC to listOf("Bottiglia plastica", "Sacchetto plastica", "Contenitore yogurt"),
-            WasteType.PAPER to listOf("Giornale", "Scatola cartone", "Foglio carta"),
-            WasteType.GLASS to listOf("Bottiglia vetro", "Barattolo vetro", "Bicchiere vetro"),
-            WasteType.ORGANIC to listOf("Buccia banana", "Avanzi cibo", "Foglie"),
-            WasteType.MIXED to listOf("Pannolino", "Cicca sigaretta", "Oggetti misti")
+    fun checkDrop(draggedItemBounds: Rect?): Pair<Boolean, WasteType?> {
+        if (draggedItemBounds == null) return Pair(false, null)
+
+        // Calculate the center of the dragged item
+        val itemCenter = Offset(
+            draggedItemBounds.left + draggedItemBounds.width / 2 + itemOffset.x,
+            draggedItemBounds.top + draggedItemBounds.height / 2 + itemOffset.y
         )
 
-        // Create 2 items of each type to have 10 total
-        val wasteTypes = WasteType.values()
-        val itemsToCreate = mutableListOf<Pair<WasteType, Int>>()
-
-        wasteTypes.forEach { type ->
-            repeat(2) {
-                itemsToCreate.add(Pair(type, it))
+        // Check if the center of the item is inside any bin
+        for (binBounds in binsBounds) {
+            if (itemCenter.x >= binBounds.bounds.left &&
+                itemCenter.x <= binBounds.bounds.right &&
+                itemCenter.y >= binBounds.bounds.top &&
+                itemCenter.y <= binBounds.bounds.bottom) {
+                // Item center is inside this bin
+                return Pair(true, binBounds.type)
             }
         }
 
-        // Shuffle the list for randomness
-        itemsToCreate.shuffle()
-
-        // Create and fetch images for each waste item
-        itemsToCreate.forEachIndexed { index, (type, variationIndex) ->
-            val wasteNames = wasteNamesByType[type] ?: listOf("Oggetto generico")
-            val wasteName = wasteNames[variationIndex % wasteNames.size]
-
-            // Get search query for this type
-            val queries = searchQueries[type] ?: listOf("waste")
-            val query = queries[variationIndex % queries.size]
-
-            // Fetch image URL from API
-            val imageUrl = searchForImage(query)
-
-            // Generate position (centered in play area)
-            val xPos = 160f
-            val yPos = 300f
-
-            allWasteItems.add(
-                WasteItem(
-                    id = index,
-                    name = wasteName,
-                    imageUrl = imageUrl,
-                    type = type,
-                    position = mutableStateOf(Offset(xPos, yPos))
-                )
-            )
-        }
-
-        // Set the first waste item as active
-        if (allWasteItems.isNotEmpty()) {
-            currentWasteItem = allWasteItems[0]
-        }
-
-        isLoading = false
+        return Pair(false, null)
     }
 
-    // Check collision between waste item and trash bin
-    fun checkCollision(wasteItem: WasteItem, trashBin: TrashBin, binPosition: Offset, binSize: Float): Boolean {
-        val wasteItemPosition = wasteItem.position.value
-        val distance = kotlin.math.sqrt(
-            (wasteItemPosition.x - binPosition.x).pow(2) +
-                    (wasteItemPosition.y - binPosition.y).pow(2)
-        )
-        return distance < binSize / 2
+    // Ho rimosso la dichiarazione duplicata di nextItem qui
+
+    fun nextItem() {
+        currentItem = allItems.random()
+        resetPosition()
     }
+    fun handleDrop() {
+        val (isInBin, binType) = checkDrop(itemBounds)
 
-    // Check if waste was disposed in the correct bin
-    fun checkWasteDisposal(wasteItem: WasteItem, trashBin: TrashBin) {
-        if (wasteItem.type == trashBin.type) {
-            // Correct!
-            score += 10
-            wasteItem.isCollected.value = true
-            showSuccessDialog = true
-            coroutineScope.launch {
-                delay(800)
-                showSuccessDialog = false
-
-                // Move to the next item
-                if (currentItemIndex < totalItems - 1) {
-                    currentItemIndex++
-                    currentWasteItem = allWasteItems[currentItemIndex]
-                } else {
-                    // Game complete
-                    gameOver = true
+        if (isInBin && binType != null) {
+            if (binType == currentItem.type) {
+                // Correct bin
+                score += 10
+                // Visual feedback for correct drop
+                scope.launch {
+                    // Briefly scale the animation for feedback
+                    delay(300)
+                    nextItem()
                 }
+            } else {
+                // Wrong bin
+                lives--
+                resetPosition()
             }
         } else {
-            // Wrong!
-            lives--
-            showErrorDialog = true
-            coroutineScope.launch {
-                delay(800)
-                showErrorDialog = false
-
-                // Game over if no lives left
-                if (lives <= 0) {
-                    gameOver = true
-                    gameActive = false
-                } else {
-                    // Reset position of current item for retry
-                    wasteItem.position.value = Offset(160f, 300f)
-                }
-            }
+            // Not dropped in any bin
+            resetPosition()
         }
     }
 
-    // Pre-calculate bin positions
-    val binPositions = remember {
-        listOf(
-            Offset(80f, 700f),
-            Offset(240f, 700f),
-            Offset(400f, 700f),
-            Offset(560f, 700f),
-            Offset(720f, 700f)
-        )
-    }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                imageVector = Icons.Default.ArrowBack,
-                                contentDescription = "Back",
-                                tint = Color.White
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        Text(
-                            text = "EcoDetective Game",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        Spacer(modifier = Modifier.weight(1f))
-
-                        // Show score
-                        Text(
-                            text = "Score: $score",
-                            color = Color.White
-                        )
-
-                        Spacer(modifier = Modifier.width(16.dp))
-
-                        // Show lives
-                        Row {
-                            for (i in 1..3) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.happy_green_logo), // Replace with heart icon
-                                    contentDescription = "Vita",
-                                    tint = if (i <= lives) Color.Red else Color.Gray,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF4CAF50)
-                )
-            )
-        }
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .background(Color(0xFFE8F5E9))
+    if (lives <= 0 || timeLeft <= 0) {
+        GameOverScreen(score = score, onRestart = {
+            score = 0
+            lives = 3
+            timeLeft = 60
+            nextItem()
+        }, onBack = onBack)
+    } else {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(16.dp),
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            if (isLoading) {
-                // Show loading indicator
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(
-                        color = Color(0xFF4CAF50)
-                    )
+            // Header
+            Row(
+                Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Punteggio: $score", fontSize = 20.sp)
+                Text("Vite: $lives", fontSize = 20.sp)
+                Text("Tempo: $timeLeft", fontSize = 20.sp)
+            }
 
-                    Text(
-                        text = "Caricamento immagini...",
-                        modifier = Modifier.padding(top = 60.dp),
-                        color = Color(0xFF4CAF50)
-                    )
-                }
-            } else if (gameActive && !gameOver) {
-                Column(
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    // Current progress
-                    Text(
-                        text = "Oggetto ${currentItemIndex + 1} di $totalItems",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF4CAF50),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        textAlign = TextAlign.Center
-                    )
-
-                    // Game area
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                    ) {
-                        // Only draw the current waste item
-                        currentWasteItem?.let { wasteItem ->
-                            if (!wasteItem.isCollected.value) {
-                                val scale by animateFloatAsState(targetValue = if (wasteItem.isDragging.value) 1.2f else 1f)
-
-                                Box(
-                                    modifier = Modifier
-                                        .offset(
-                                            x = wasteItem.position.value.x.dp,
-                                            y = wasteItem.position.value.y.dp
-                                        )
-                                        .size(80.dp)
-                                        .scale(scale)
-                                        .zIndex(10f) // Make sure waste items are above bins
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(Color.White)
-                                        .border(
-                                            width = if (wasteItem.isDragging.value) 2.dp else 1.dp,
-                                            color = if (wasteItem.isDragging.value) Color(0xFF4CAF50) else Color.LightGray,
-                                            shape = RoundedCornerShape(8.dp)
-                                        )
-                                        .pointerInput(wasteItem.id) {
-                                            detectDragGestures(
-                                                onDragStart = {
-                                                    wasteItem.isDragging.value = true
-                                                },
-                                                onDragEnd = {
-                                                    wasteItem.isDragging.value = false
-
-                                                    // Check if released on a bin
-                                                    trashBins.forEachIndexed { index, bin ->
-                                                        if (checkCollision(wasteItem, bin, binPositions[index], 80f)) {
-                                                            checkWasteDisposal(wasteItem, bin)
-                                                        }
-                                                    }
-                                                },
-                                                onDragCancel = {
-                                                    wasteItem.isDragging.value = false
-                                                },
-                                                onDrag = { change, dragAmount ->
-                                                    change.consume()
-                                                    wasteItem.position.value = Offset(
-                                                        x = wasteItem.position.value.x + dragAmount.x,
-                                                        y = wasteItem.position.value.y + dragAmount.y
-                                                    )
-                                                }
-                                            )
+            // Waste item (moved above bins for better drag experience)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(id = currentItem.imageRes),
+                    contentDescription = currentItem.name,
+                    modifier = Modifier
+                        .offset { animatedOffset.value.toIntOffset() }
+                        .size(120.dp)
+                        .onGloballyPositioned { coordinates ->
+                            // Store the initial bounds of the item
+                            itemBounds = coordinates.boundsInWindow()
+                            val bounds = coordinates.boundsInWindow()
+                            // Always update the center position when positioned
+                            itemInitialCenter = Offset(
+                                bounds.left + bounds.width / 2,
+                                bounds.top + bounds.height / 2
+                            )
+                            println("Initial center set to: $itemInitialCenter")
+                        }
+                        .pointerInput(Unit) {
+                            detectDragGestures(
+                                onDragStart = {
+                                    isDragging = true
+                                    // Reset offset to ensure we're calculating from the right position
+                                    if (itemOffset != Offset.Zero) {
+                                        itemOffset = Offset.Zero
+                                        scope.launch {
+                                            animatedOffset.snapTo(Offset.Zero)
                                         }
-                                ) {
-                                    Column(
-                                        modifier = Modifier.fillMaxSize(),
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
-                                        // Load image from URL using Coil
-                                        AsyncImage(
-                                            model = ImageRequest.Builder(context)
-                                                .data(wasteItem.imageUrl)
-                                                .crossfade(true)
-                                                .build(),
-                                            contentDescription = wasteItem.name,
-                                            contentScale = ContentScale.Crop,
-                                            modifier = Modifier
-                                                .size(60.dp)
-                                                .clip(RoundedCornerShape(4.dp))
-                                        )
-
-                                        Text(
-                                            text = wasteItem.name,
-                                            fontSize = 12.sp,
-                                            textAlign = TextAlign.Center,
-                                            maxLines = 1
-                                        )
+                                    }
+                                },
+                                onDragEnd = {
+                                    isDragging = false
+                                    println("Drag ended with offset: $itemOffset")
+                                    handleDrop()
+                                },
+                                onDragCancel = {
+                                    isDragging = false
+                                    resetPosition()
+                                },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    val newOffset = itemOffset + Offset(dragAmount.x, dragAmount.y)
+                                    itemOffset = newOffset
+                                    scope.launch {
+                                        animatedOffset.snapTo(newOffset)
                                     }
                                 }
-                            }
-                        }
-                    }
-
-                    // Bins area
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(150.dp)
-                            .background(Color(0xFFDCEDC8))
-                            .padding(horizontal = 8.dp)
-                            .zIndex(1f), // Make sure bins are below waste items
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        trashBins.forEach { bin ->
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(80.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(bin.color)
-                                        .border(1.dp, Color.DarkGray, RoundedCornerShape(8.dp)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Image(
-                                        painter = painterResource(id = bin.iconRes),
-                                        contentDescription = bin.name,
-                                        modifier = Modifier.size(48.dp)
-                                    )
-                                }
-
-                                Text(
-                                    text = bin.name,
-                                    fontSize = 12.sp,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Success dialog
-                if (showSuccessDialog) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color(0x88000000))
-                            .zIndex(100f),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Card(
-                            modifier = Modifier
-                                .size(200.dp)
-                                .clip(CircleShape),
-                            colors = CardDefaults.cardColors(
-                                containerColor = Color(0xFF4CAF50)
                             )
-                        ) {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "Corretto!",
-                                    color = Color.White,
-                                    fontSize = 24.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Error dialog
-                if (showErrorDialog) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color(0x88000000))
-                            .zIndex(100f),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Card(
-                            modifier = Modifier
-                                .size(200.dp)
-                                .clip(CircleShape),
-                            colors = CardDefaults.cardColors(
-                                containerColor = Color(0xFFF44336)
-                            )
-                        ) {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "Sbagliato!",
-                                    color = Color.White,
-                                    fontSize = 24.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-                }
-            } else if (gameOver) {
-                // Game Over screen
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = if (lives > 0) "Hai completato il gioco!" else "Game Over",
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (lives > 0) Color(0xFF4CAF50) else Color(0xFFF44336)
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = "Punteggio finale: $score",
-                        fontSize = 20.sp
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = "Oggetti raccolti correttamente: ${score / 10}/$totalItems",
-                        fontSize = 18.sp
-                    )
-
-                    Spacer(modifier = Modifier.height(32.dp))
-
-                    Button(
-                        onClick = {
-                            // Restart the game
-                            score = 0
-                            lives = 3
-                            currentItemIndex = 0
-                            gameOver = false
-                            gameActive = true
-
-                            // Reset all waste items
-                            allWasteItems.forEach {
-                                it.isCollected.value = false
-                                it.position.value = Offset(160f, 300f)
-                            }
-
-                            // Set first item as active
-                            if (allWasteItems.isNotEmpty()) {
-                                currentWasteItem = allWasteItems[0]
-                            }
                         },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF4CAF50)
-                        )
-                    ) {
-                        Text("Gioca di nuovo")
-                    }
+                    contentScale = ContentScale.Fit
+                )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = currentItem.name,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(top = 130.dp),
+                    fontWeight = FontWeight.Bold
+                )
+            }
 
-                    Button(
-                        onClick = onBack,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF9E9E9E)
-                        )
-                    ) {
-                        Text("Torna indietro")
+            // Trash bins
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 32.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                TrashBin(
+                    type = WasteType.PLASTIC,
+                    onPositioned = { bounds ->
+                        // Update bins bounds list with this bin's position
+                        val existingList = binsBounds.filter { it.type != WasteType.PLASTIC }
+                        binsBounds = existingList + BinBounds(WasteType.PLASTIC, bounds)
                     }
-                }
+                )
+
+                TrashBin(
+                    type = WasteType.PAPER,
+                    onPositioned = { bounds ->
+                        val existingList = binsBounds.filter { it.type != WasteType.PAPER }
+                        binsBounds = existingList + BinBounds(WasteType.PAPER, bounds)
+                    }
+                )
+
+                TrashBin(
+                    type = WasteType.ORGANIC,
+                    onPositioned = { bounds ->
+                        val existingList = binsBounds.filter { it.type != WasteType.ORGANIC }
+                        binsBounds = existingList + BinBounds(WasteType.ORGANIC, bounds)
+                    }
+                )
+            }
+
+            // Game instructions
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(
+                    text = "Trascina il rifiuto nel cestino corretto!",
+                    modifier = Modifier.padding(16.dp),
+                    fontSize = 16.sp
+                )
+            }
+
+            // Back button
+            Button(
+                onClick = onBack,
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .padding(16.dp)
+            ) {
+                Text("Torna indietro")
             }
         }
     }
 }
 
-// Extension to calculate the power of a number
-fun Float.pow(exponent: Int): Float {
-    var result = 1f
-    repeat(exponent) {
-        result *= this
+@Composable
+fun TrashBin(type: WasteType, onPositioned: (Rect) -> Unit) {
+    val binColor = when (type) {
+        WasteType.PLASTIC -> Color(0xFF03A9F4) // Blue
+        WasteType.PAPER -> Color(0xFFFFEB3B)   // Yellow
+        WasteType.ORGANIC -> Color(0xFF4CAF50) // Green
+        WasteType.GLASS -> TODO()
     }
-    return result
+
+    val binIcon = when (type) {
+        WasteType.PLASTIC -> R.drawable.placeholder // Replace with actual icons
+        WasteType.PAPER -> R.drawable.placeholder
+        WasteType.ORGANIC -> R.drawable.placeholder
+        WasteType.GLASS -> TODO()
+    }
+
+    Box(
+        modifier = Modifier
+            .size(110.dp)
+            .background(binColor.copy(alpha = 0.7f), RoundedCornerShape(8.dp))
+            .onGloballyPositioned { coordinates ->
+                // Pass the bin's bounds back for collision detection
+                onPositioned(coordinates.boundsInWindow())
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Image(
+                painter = painterResource(id = binIcon),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(50.dp)
+                    .padding(4.dp),
+                contentScale = ContentScale.Fit
+            )
+
+            Text(
+                text = when (type) {
+                    WasteType.PLASTIC -> "Plastica"
+                    WasteType.PAPER -> "Carta"
+                    WasteType.ORGANIC -> "Organico"
+                    WasteType.GLASS -> "Vetro"
+                },
+                fontWeight = FontWeight.Bold,
+                color = Color.Black
+            )
+        }
+    }
 }
 
-@Preview(showBackground = true)
 @Composable
-fun EcoDetectiveGameScreenPreview() {
-    FrontendhappygreenTheme {
-        EcoDetectiveGameScreen()
+fun GameOverScreen(score: Int, onRestart: () -> Unit, onBack: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp)
+            .background(Color.White),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("Game Over", fontSize = 32.sp, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(16.dp))
+        Text("Punteggio: $score", fontSize = 24.sp)
+        Spacer(modifier = Modifier.height(32.dp))
+        Button(onClick = onRestart) {
+            Text("Riprova")
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+        Button(onClick = onBack) {
+            Text("Torna alla Home")
+        }
     }
 }
+
+// Estensione per convertire Offset a IntOffset
+
+fun Offset.toIntOffset() = IntOffset(x.toInt(), y.toInt())
