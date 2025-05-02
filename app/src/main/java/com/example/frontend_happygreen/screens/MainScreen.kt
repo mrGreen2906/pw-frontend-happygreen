@@ -24,9 +24,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CropFree
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Forest
 import androidx.compose.material.icons.filled.Home
@@ -34,6 +36,7 @@ import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
@@ -54,10 +57,9 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -78,6 +80,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.frontend_happygreen.R
+import com.example.frontend_happygreen.barcode.BarcodeScannerScreen
 import com.example.frontend_happygreen.games.EcoDetectiveGameScreen
 import com.example.frontend_happygreen.games.EcoGameScreen
 import com.example.frontend_happygreen.ui.components.SectionHeader
@@ -181,8 +184,13 @@ fun MainScreen(
     var showEcoDetectiveGame by remember { mutableStateOf(false) }
     var showEcoSfidaGame by remember { mutableStateOf(false) }
 
-    val tabItems = listOf("Home", "Esplora", "Profilo")
-    val icons = listOf(Icons.Default.Home, Icons.Default.Search, Icons.Default.Person)
+    val tabItems = listOf("Home", "Esplora", "Scanner", "Profilo")
+    val icons = listOf(
+        Icons.Default.Home,
+        Icons.Default.Search,
+        Icons.Default.CropFree,  // Nuova icona per scanner barcode
+        Icons.Default.Person
+    )
     val coroutineScope = rememberCoroutineScope()
 
     // Game screens
@@ -242,100 +250,191 @@ fun MainScreen(
 
 
     // Top Bar
-    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     fun AppTopBar(
         onProfileClick: () -> Unit,
+        onGamesClick: () -> Unit,
         hasNotifications: Boolean = false,
         notificationCount: Int = 0
     ) {
-        TopAppBar(
-            title = {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(140.dp),
+            color = Green600
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = 42.dp, bottom = 12.dp, start = 16.dp, end = 16.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Top row with logo and actions
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    // Logo
-                    Image(
-                        painter = painterResource(id = R.drawable.happy_green_logo),
-                        contentDescription = "App Logo",
-                        modifier = Modifier.size(32.dp)
-                    )
+                    // App logo and name with larger size
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.happy_green_logo),
+                            contentDescription = "App Logo",
+                            modifier = Modifier.size(48.dp)
+                        )
 
-                    Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
 
-                    Text(
-                        text = "HappyGreen",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold
-                    )
+                        Text(
+                            text = "HappyGreen",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 24.sp
+                        )
+                    }
 
                     Spacer(modifier = Modifier.weight(1f))
 
-                    // Notifications
-                    if (hasNotifications) {
-                        NotificationIcon(count = notificationCount)
+                    // Action buttons
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Giochi button - AGGIUNTO QUI
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.2f))
+                                .clickable(onClick = onGamesClick)
+                                .padding(8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.SportsEsports,
+                                contentDescription = "Giochi",
+                                tint = Color.White,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+
+                        // Notifications
+                        if (hasNotifications) {
+                            NotificationIcon(count = notificationCount)
+                        }
+
+                        // Profile
+                        UserAvatar(onClick = onProfileClick)
                     }
-
-                    // Profile
-                    UserAvatar(onClick = onProfileClick)
                 }
-            },
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = Green600)
-        )
-    }
 
-    @Composable
-    fun NotificationIcon(count: Int) {
-        Box(
-            modifier = Modifier
-                .padding(horizontal = 8.dp)
-                .clickable { /* Handle notifications */ }
-        ) {
-            Icon(
-                imageVector = Icons.Default.Notifications,
-                contentDescription = "Notifiche",
-                tint = Color.White
-            )
-
-            if (count > 0) {
-                Box(
-                    modifier = Modifier
-                        .size(16.dp)
-                        .align(Alignment.TopEnd)
-                        .offset(x = 4.dp, y = (-4).dp)
-                        .background(Color.Red, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = if (count > 9) "9+" else count.toString(),
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontSize = 10.sp
-                    )
-                }
+                // Rimuoviamo il pulsante dei giochi dalla parte inferiore
+                // poiché ora è nella barra superiore
+                Spacer(modifier = Modifier.height(20.dp))
             }
         }
     }
 
-    @Composable
-    fun UserAvatar(onClick: () -> Unit) {
+@Composable
+fun ActionButton(
+    icon: ImageVector,
+    text: String,
+    onClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(8.dp)
+    ) {
+        // Fix icon sizing with even more space
         Box(
             modifier = Modifier
-                .size(40.dp)
+                .size(56.dp) // Further increased size
                 .clip(CircleShape)
-                .background(Color.LightGray)
-                .border(1.dp, Color.White, CircleShape)
-                .clickable(onClick = onClick)
+                .background(Color.White.copy(alpha = 0.2f))
+                .padding(8.dp), // Added more padding inside the circle
+            contentAlignment = Alignment.Center
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.happy_green_logo),
-                contentDescription = "Profile",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
+            Icon(
+                imageVector = icon,
+                contentDescription = text,
+                tint = Color.White,
+                modifier = Modifier.size(30.dp) // Slightly larger icon
             )
         }
+
+        Spacer(modifier = Modifier.height(8.dp)) // More space between icon and text
+
+        Text(
+            text = text,
+            color = Color.White,
+            fontSize = 16.sp, // Slightly larger text
+            fontWeight = FontWeight.Medium
+        )
     }
+}
+// Updated UserAvatar function with larger size
+@Composable
+fun UserAvatar(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(48.dp) // Increased from 46dp
+            .clip(CircleShape)
+            .background(Color.LightGray)
+            .border(2.dp, Color.White, CircleShape)
+            .clickable(onClick = onClick)
+    ) {
+        Image(
+            painter = painterResource(id = R.drawable.happy_green_logo),
+            contentDescription = "Profile",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+}
+
+// Updated NotificationIcon function with larger size
+@Composable
+fun NotificationIcon(count: Int) {
+    Box(
+        modifier = Modifier
+            .padding(horizontal = 8.dp)
+            .size(48.dp) // Increased size to match avatar
+            .clip(CircleShape)
+            .background(Color.White.copy(alpha = 0.2f))
+            .clickable { /* Handle notifications */ }
+            .padding(8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = Icons.Default.Notifications,
+            contentDescription = "Notifiche",
+            tint = Color.White,
+            modifier = Modifier.size(24.dp)
+        )
+
+        if (count > 0) {
+            Box(
+                modifier = Modifier
+                    .size(22.dp) // Increased size
+                    .align(Alignment.TopEnd)
+                    .offset(x = 6.dp, y = (-6).dp)
+                    .background(Color.Red, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (count > 9) "9+" else count.toString(),
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = 12.sp // Slightly increased
+                )
+            }
+        }
+    }
+}
 
 
     @Composable
@@ -849,6 +948,7 @@ fun ActivityCard(
     fun GamesBanner(
         games: List<Game>,
         onGameSelected: (String) -> Unit,
+        onScanBarcode: () -> Unit, // New parameter for barcode scanning
         onDismiss: () -> Unit,
         modifier: Modifier = Modifier
     ) {
@@ -865,17 +965,29 @@ fun ActivityCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Giochi",
+                        text = "Giochi & Strumenti",  // Changed from just "Giochi" to include tools
                         style = MaterialTheme.typography.titleMedium,
                         color = Green600,
                         modifier = Modifier.padding(start = 8.dp)
                     )
-                    IconButton(onClick = onDismiss) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Chiudi Banner Giochi",
-                            tint = Green600
-                        )
+
+                    Row {
+                        // Barcode Scanner Button - Add this
+                        IconButton(onClick = onScanBarcode) {
+                            Icon(
+                                imageVector = Icons.Default.CropFree,  // Barcode icon
+                                contentDescription = "Scansiona Codice a Barre",
+                                tint = Green600
+                            )
+                        }
+
+                        IconButton(onClick = onDismiss) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Chiudi Banner",
+                                tint = Green600
+                            )
+                        }
                     }
                 }
                 LazyRow(
@@ -900,7 +1012,8 @@ fun ActivityCard(
     }
 
 
-    // Dialogs
+
+// Dialogs
     @Composable
     fun ProfileDialog(
         volumeLevel: Float,
@@ -1295,6 +1408,185 @@ fun CreateClassDialog(
             }
         }
     }
+@Composable
+fun GamesScreen(
+    games: List<Game>,
+    onGameSelected: (String) -> Unit,
+    onBack: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
+    ) {
+        // Barra superiore personalizzata con padding maggiore
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Green600)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 42.dp, bottom = 12.dp, start = 16.dp, end = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Icona indietro
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Indietro",
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                // Titolo
+                Text(
+                    text = "Giochi Eco-friendly",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 24.sp
+                )
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                // Icona giochi (aggiunta vicino al titolo)
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.2f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SportsEsports,
+                        contentDescription = "Giochi",
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+            }
+        }
+
+        // Contenuto con padding maggiore
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp), // Padding aumentato
+            verticalArrangement = Arrangement.spacedBy(24.dp) // Spazio tra gli elementi aumentato
+        ) {
+            item {
+                Text(
+                    text = "Scegli un gioco per divertirti e imparare",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Green800,
+                    fontSize = 18.sp // Dimensione testo aumentata
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            items(games) { game ->
+                GameCard(
+                    game = game,
+                    onClick = { onGameSelected(game.id) }
+                )
+            }
+
+            // Aggiungi spazio extra in fondo
+            item {
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun GameCard(
+    game: Game,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(180.dp)
+            .clickable(onClick = onClick),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
+            // Immagine del gioco (dimensione aumentata)
+            Box(
+                modifier = Modifier
+                    .size(140.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Green100),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(id = game.iconId),
+                    contentDescription = game.name,
+                    modifier = Modifier.size(100.dp),
+                    contentScale = ContentScale.Fit
+                )
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            // Dettagli del gioco
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = game.name,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 22.sp // Dimensione testo aumentata
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = game.description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.Gray,
+                    fontSize = 16.sp // Dimensione testo aumentata
+                )
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                // Pulsante Gioca (dimensione aumentata)
+                Button(
+                    onClick = onClick,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Green600
+                    ),
+                    modifier = Modifier
+                        .align(Alignment.End)
+                        .height(48.dp), // Altezza aumentata
+                    shape = RoundedCornerShape(24.dp) // Bordi più arrotondati
+                ) {
+                    Text(
+                        "Gioca",
+                        fontSize = 16.sp,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainAppScaffold(
@@ -1315,18 +1607,33 @@ fun MainAppScaffold(
     onHideGamesBanner: () -> Unit
 ) {
     var showEcoAIChat by remember { mutableStateOf(false) }
+    var showBarcodeScanner by remember { mutableStateOf(false) }
+    var showGamesScreen by remember { mutableStateOf(false) }
 
     if (showEcoAIChat) {
         EcoAIChatScreen(onBack = { showEcoAIChat = false })
+    } else if (showBarcodeScanner) {
+        BarcodeScannerScreen(onBack = { showBarcodeScanner = false })
+    } else if (showGamesScreen) {
+        GamesScreen(
+            games = gamesList,
+            onGameSelected = { gameId ->
+                showGamesScreen = false
+                onGameSelected(gameId)
+            },
+            onBack = { showGamesScreen = false }
+        )
     } else {
         Scaffold(
             topBar = {
                 AppTopBar(
                     onProfileClick = onProfileClick,
+                    onGamesClick = { showGamesScreen = true },
                     hasNotifications = hasNotifications,
                     notificationCount = notificationCount
                 )
             },
+            // Rest of the code remains the same...
             bottomBar = {
                 NavigationBar {
                     tabItems.forEachIndexed { index, item ->
@@ -1334,14 +1641,20 @@ fun MainAppScaffold(
                             icon = { Icon(icons[index], contentDescription = item) },
                             label = { Text(item) },
                             selected = currentTab == index,
-                            onClick = { onTabSelected(index) }
+                            onClick = {
+                                // Gestione speciale per il tab scanner
+                                if (index == 2) { // Scanner tab
+                                    showBarcodeScanner = true
+                                } else {
+                                    onTabSelected(index)
+                                }
+                            }
                         )
                     }
                 }
             },
             floatingActionButton = {
                 Column(horizontalAlignment = Alignment.End) {
-                    // AI Chat FAB
                     FloatingActionButton(
                         onClick = { showEcoAIChat = true },
                         containerColor = Color(0xFF009688),
@@ -1354,7 +1667,6 @@ fun MainAppScaffold(
                         )
                     }
 
-                    // Create Class FAB (only on Home tab)
                     if (currentTab == 0) {
                         FloatingActionButton(
                             onClick = onCreateClassClick,
@@ -1374,29 +1686,39 @@ fun MainAppScaffold(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
-                    .background(Color.White),
+                    .background(Color.White)
             ) {
+                // Contenuto principale
                 when {
                     isLoading -> CenteredLoader(message = "Caricamento in corso...")
                     else -> {
                         when (currentTab) {
                             0 -> HomeContent(classList = classList, onClassSelected = onClassSelected)
                             1 -> ExploreContent()
-                            2 -> ProfileContent()
+                            3 -> ProfileContent()  // Aggiornato l'indice perché ora abbiamo 4 tab
                             else -> HomeContent(classList = classList, onClassSelected = onClassSelected)
                         }
                     }
                 }
 
-                // Games banner
+                // Rimuoviamo il banner perché ora abbiamo una schermata dedicata per i giochi
+                // Se lo vuoi mantenere, rimetti questo codice
+                /*
                 if (showGamesBanner) {
-                    GamesBanner(
-                        games = gamesList,
-                        onGameSelected = onGameSelected,
-                        onDismiss = onHideGamesBanner,
-                        modifier = Modifier.align(Alignment.BottomCenter)
-                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.BottomCenter)
+                    ) {
+                        GamesBanner(
+                            games = gamesList,
+                            onGameSelected = onGameSelected,
+                            onScanBarcode = { showBarcodeScanner = true },
+                            onDismiss = onHideGamesBanner
+                        )
+                    }
                 }
+                */
             }
         }
     }
