@@ -7,7 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -137,7 +136,7 @@ class MainScreenViewModel : ViewModel() {
         availableGames.value = listOf(
             Game("eco_detective", "Eco Detective", "Smista i rifiuti nei cestini corretti", R.drawable.happy_green_logo),
             Game("eco_sfida", "Eco Sfida", "Confronta l'impatto ambientale", R.drawable.happy_green_logo),
-            Game("tree_planter", "Tree Planter", "Simulatore di piantumazione", R.drawable.happy_green_logo)
+            Game("tree_planter", "Tree Planter", "Simulatore di piantumazione", R.drawable.tree_planter_game_logo)
         )
 
         isLoading.value = false
@@ -336,46 +335,6 @@ fun MainScreen(
         }
     }
 
-@Composable
-fun ActionButton(
-    icon: ImageVector,
-    text: String,
-    onClick: () -> Unit
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
-            .padding(8.dp)
-    ) {
-        // Fix icon sizing with even more space
-        Box(
-            modifier = Modifier
-                .size(56.dp) // Further increased size
-                .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.2f))
-                .padding(8.dp), // Added more padding inside the circle
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = text,
-                tint = Color.White,
-                modifier = Modifier.size(30.dp) // Slightly larger icon
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp)) // More space between icon and text
-
-        Text(
-            text = text,
-            color = Color.White,
-            fontSize = 16.sp, // Slightly larger text
-            fontWeight = FontWeight.Medium
-        )
-    }
-}
 // Updated UserAvatar function with larger size
 @Composable
 fun UserAvatar(onClick: () -> Unit) {
@@ -458,24 +417,7 @@ fun NotificationIcon(count: Int) {
             )
         }
     }
-@Composable
-fun SectionHeader(
-    title: String,
-    action: @Composable (() -> Unit)? = null
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = Green800
-        )
-        action?.invoke()
-    }
-}
+
 
     @Composable
     fun ClassCard(
@@ -883,135 +825,6 @@ fun ActivityCard(
             }
         }
     }
-
-
-
-
-
-
-
-
-    @Composable
-    fun GameCardCompact(
-        name: String,
-        description: String,
-        iconId: Int,
-        onClick: () -> Unit
-    ) {
-        Card(
-            modifier = Modifier
-                .width(140.dp)
-                .height(160.dp)
-                .clickable(onClick = onClick),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(70.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Green100),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Image(
-                        painter = painterResource(id = iconId),
-                        contentDescription = name,
-                        modifier = Modifier.size(50.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = name,
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.Gray,
-                    maxLines = 2
-                )
-            }
-        }
-    }
-
-
-    // Games Banner
-    @Composable
-    fun GamesBanner(
-        games: List<Game>,
-        onGameSelected: (String) -> Unit,
-        onScanBarcode: () -> Unit, // New parameter for barcode scanning
-        onDismiss: () -> Unit,
-        modifier: Modifier = Modifier
-    ) {
-        Box(
-            modifier = modifier
-                .fillMaxWidth()
-                .background(Green100)
-                .padding(8.dp)
-        ) {
-            Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Giochi & Strumenti",  // Changed from just "Giochi" to include tools
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Green600,
-                        modifier = Modifier.padding(start = 8.dp)
-                    )
-
-                    Row {
-                        // Barcode Scanner Button - Add this
-                        IconButton(onClick = onScanBarcode) {
-                            Icon(
-                                imageVector = Icons.Default.CropFree,  // Barcode icon
-                                contentDescription = "Scansiona Codice a Barre",
-                                tint = Green600
-                            )
-                        }
-
-                        IconButton(onClick = onDismiss) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Chiudi Banner",
-                                tint = Green600
-                            )
-                        }
-                    }
-                }
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    items(
-                        items = games,
-                        key = { it.id }
-                    ) { game ->
-                        GameCardCompact(
-                            name = game.name,
-                            description = game.description,
-                            iconId = game.iconId,
-                            onClick = { onGameSelected(game.id) }
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-
 
 // Dialogs
     @Composable
