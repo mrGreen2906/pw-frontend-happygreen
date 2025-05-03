@@ -183,6 +183,9 @@ fun MainScreen(
     var showEcoDetectiveGame by remember { mutableStateOf(false) }
     var showEcoSfidaGame by remember { mutableStateOf(false) }
 
+    // Stato per Classroom Screen
+    var showClassroomScreen by remember { mutableStateOf<ClassRoom?>(null) }
+
     val tabItems = listOf("Home", "Esplora", "Scanner", "Profilo")
     val icons = listOf(
         Icons.Default.Home,
@@ -192,8 +195,12 @@ fun MainScreen(
     )
     val coroutineScope = rememberCoroutineScope()
 
-    // Game screens
+    // Game screens e Classroom Screen
     when {
+        showClassroomScreen != null -> ClassroomScreen(
+            classRoom = showClassroomScreen!!,
+            onBack = { showClassroomScreen = null }
+        )
         showEcoDetectiveGame -> EcoDetectiveGameScreen(onBack = { showEcoDetectiveGame = false })
         showEcoSfidaGame -> EcoGameScreen()
         else -> MainAppScaffold(
@@ -209,7 +216,9 @@ fun MainScreen(
             onTabSelected = viewModel::setCurrentTab,
             onProfileClick = { showProfileDialog = true },
             onCreateClassClick = { showCreateClassDialog = true },
-            onClassSelected = viewModel::joinClass,
+            onClassSelected = { classroom ->
+                showClassroomScreen = classroom
+            },
             onGameSelected = { gameId ->
                 when (gameId) {
                     "eco_detective" -> showEcoDetectiveGame = true
@@ -245,8 +254,6 @@ fun MainScreen(
         )
     }
 }
-
-
 
     // Top Bar
     @Composable
