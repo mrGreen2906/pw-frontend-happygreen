@@ -14,6 +14,7 @@ import com.example.frontend_happygreen.audio.AudioController
 import com.example.frontend_happygreen.screens.AuthScreen
 import com.example.frontend_happygreen.screens.LoadingScreen
 import com.example.frontend_happygreen.screens.MainScreen
+import com.example.frontend_happygreen.screens.VerifyOTPScreen
 import com.example.frontend_happygreen.screens.WelcomeScreen
 import com.example.frontend_happygreen.ui.theme.FrontendhappygreenTheme
 
@@ -59,25 +60,54 @@ fun HappyGreenApp(
     onVolumeChange: (Float) -> Unit = {},
     volumeLevel: Float = 0.5f
 ) {
-    var currentScreen by remember { mutableStateOf(Screen.Welcome) }
+    var currentScreen by remember { mutableStateOf<Screen>(Screen.Welcome) }
+    var userId by remember { mutableStateOf<Int?>(null) }
 
-    when (currentScreen) {
+    when (val screen = currentScreen) {
         Screen.Welcome -> WelcomeScreen(
             onGetStartedClick = { currentScreen = Screen.Auth }
         )
+
         Screen.Auth -> AuthScreen(
-            onAuthComplete = { currentScreen = Screen.Loading }
+            onAuthComplete = {
+                currentScreen = Screen.Loading
+            },
+            onNeedVerification = { id ->
+                userId = id
+                currentScreen = Screen.VerifyOTP
+            }
         )
+
         Screen.Loading -> LoadingScreen(
             onLoadingComplete = { currentScreen = Screen.Main }
         )
+
         Screen.Main -> MainScreen(
             volumeLevel = volumeLevel,
             onVolumeChange = onVolumeChange,
             onLogout = { currentScreen = Screen.Welcome }
         )
+
+        Screen.VerifyOTP -> {
+            userId?.let { id ->
+                VerifyOTPScreen(
+                    userId = id,
+                    onVerificationComplete = {
+                        currentScreen = Screen.Loading
+                    }
+                )
+            } ?: run {
+                // Se userId è null, torna alla schermata di autenticazione
+                currentScreen = Screen.Auth
+            }
+        }
     }
 }
-enum class Screen {
-    Welcome, Auth, Loading, Main
+
+sealed class Screen {
+    object Welcome : Screen()
+    object Auth : Screen()
+    object Loading : Screen()
+    object Main : Screen()
+    object VerifyOTP : Screen()
 }

@@ -88,6 +88,278 @@ import com.example.frontend_happygreen.ui.theme.Green300
 import com.example.frontend_happygreen.ui.theme.Green600
 import com.example.frontend_happygreen.ui.theme.Green800
 import kotlinx.coroutines.launch
+import androidx.lifecycle.viewModelScope
+import com.example.frontend_happygreen.api.ApiService
+import com.example.frontend_happygreen.api.RetrofitClient
+import com.example.frontend_happygreen.data.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.frontend_happygreen.ui.components.CenteredLoader
+
+class MainScreenViewModel : ViewModel() {
+    private val apiService = RetrofitClient.create(ApiService::class.java)
+
+    // Dati utente (presi da UserSession)
+    var userName = mutableStateOf(UserSession.getFullName())
+    var userEmail = mutableStateOf(UserSession.getEmail() ?: "")
+    var userPoints = mutableStateOf(UserSession.getEcoPoints() ?: 0)
+    var userLevel = mutableStateOf(calculateLevel(UserSession.getEcoPoints() ?: 0))
+
+    // Stati UI
+    var isLoading = mutableStateOf(true)
+    var errorMessage = mutableStateOf<String?>(null)
+
+    // Dati dell'app
+    var classes = mutableStateOf<List<ClassRoom>>(emptyList())
+    var availableGames = mutableStateOf<List<Game>>(emptyList())
+    var userBadges = mutableStateOf<List<Badge>>(emptyList())
+    var showGamesBanner = mutableStateOf(true)
+    var currentTab = mutableStateOf(0)
+    var hasNotifications = mutableStateOf(false)
+    var notificationCount = mutableStateOf(0)
+
+    // Post dell'utente
+    private val _userPosts = MutableStateFlow<List<Post>>(emptyList())
+    val userPosts: StateFlow<List<Post>> = _userPosts.asStateFlow()
+
+    init {
+        loadUserData()
+        loadInitialData()
+    }
+
+    /**
+     * Carica i dati dell'utente dal server
+     */
+    private fun loadUserData() {
+        viewModelScope.launch {
+            try {
+                val token = UserSession.getAuthHeader()
+                if (token != null) {
+                    // Ottieni dati utente attuali
+                    val response = apiService.getCurrentUser(token)
+                    if (response.isSuccessful && response.body() != null) {
+                        val userData = response.body()!!
+                        UserSession.updateUserData(userData)
+
+                        // Aggiorna i dati dell'utente nel ViewModel
+                        userName.value = UserSession.getFullName()
+                        userEmail.value = UserSession.getEmail() ?: ""
+                        userPoints.value = UserSession.getEcoPoints() ?: 0
+                        userLevel.value = calculateLevel(userPoints.value)
+
+                        // Carica badge utente
+                        loadUserBadges()
+
+                        // Carica anche notifiche
+                        checkNotifications()
+                    }
+                }
+            } catch (e: Exception) {
+                errorMessage.value = "Errore nel caricamento dei dati utente: ${e.message}"
+            }
+        }
+    }
+
+    /**
+     * Determina il livello dell'utente in base ai punti eco
+     */
+    private fun calculateLevel(points: Int): String {
+        return when {
+            points >= 5000 -> "Eco Master"
+            points >= 3000 -> "Eco Champion"
+            points >= 1000 -> "Eco Warrior"
+            points >= 500 -> "Eco Enthusiast"
+            else -> "Eco Beginner"
+        }
+    }
+
+    /**
+     * Controlla se ci sono notifiche per l'utente
+     */
+    private fun checkNotifications() {
+        // In un'app reale, qui faresti una chiamata API per ottenere le notifiche
+        // Per ora, simuliamo alcune notifiche solo per demo
+        hasNotifications.value = true
+        notificationCount.value = 3
+    }
+
+    /**
+     * Carica i dati iniziali dell'app
+     */
+    private fun loadInitialData() {
+        viewModelScope.launch {
+            try {
+                // Carica gruppi (classi)
+                loadGroups()
+
+                // Carica giochi (dato statico per ora)
+                loadGames()
+
+                isLoading.value = false
+            } catch (e: Exception) {
+                errorMessage.value = "Errore nel caricamento dei dati: ${e.message}"
+                isLoading.value = false
+            }
+        }
+    }
+
+    /**
+     * Carica i gruppi dal server
+     */
+    private suspend fun loadGroups() {
+        val token = UserSession.getAuthHeader()
+        if (token != null) {
+            try {
+                val response = apiService.getGroups(token)
+                if (response.isSuccessful && response.body() != null) {
+                    val groups = response.body()!!
+
+                    // Converti in oggetti ClassRoom
+                    classes.value = groups.map { group ->
+                        ClassRoom(
+                            name = group.name,
+                            backgroundImageId = R.drawable.happy_green_logo,
+                            teacherName = "Insegnante ${group.id}" // Idealmente dovresti ottenere il nome dal server
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                // In caso di errore, mantieni i dati di demo
+                classes.value = listOf(
+                    ClassRoom("Eco Science 101", R.drawable.happy_green_logo, "Prof. Smith"),
+                    ClassRoom("Environmental Studies", R.drawable.happy_green_logo, "Prof. Johnson"),
+                    ClassRoom("Green Technologies", R.drawable.happy_green_logo, "Prof. Martinez"),
+                    ClassRoom("Sustainable Development", R.drawable.happy_green_logo, "Prof. Garcia")
+                )
+            }
+        }
+    }
+
+    /**
+     * Carica i dati dei giochi (statico per ora)
+     */
+    private fun loadGames() {
+        availableGames.value = listOf(
+            Game("eco_detective", "Eco Detective", "Smista i rifiuti nei cestini corretti", R.drawable.happy_green_logo),
+            Game("eco_sfida", "Eco Sfida", "Confronta l'impatto ambientale", R.drawable.happy_green_logo),
+            Game("tree_planter", "Tree Planter", "Simulatore di piantumazione", R.drawable.happy_green_logo)
+        )
+    }
+
+    /**
+     * Carica i badge dell'utente
+     */
+    private suspend fun loadUserBadges() {
+        val token = UserSession.getAuthHeader()
+        if (token != null) {
+            try {
+                // Ottieni i badge dell'utente
+                val userBadgesResponse = apiService.getUserBadges(token)
+                if (userBadgesResponse.isSuccessful && userBadgesResponse.body() != null) {
+                    val userBadgesList = userBadgesResponse.body()!!
+
+                    // Ottieni tutti i badge
+                    val badgesResponse = apiService.getBadges(token)
+                    if (badgesResponse.isSuccessful && badgesResponse.body() != null) {
+                        val allBadges = badgesResponse.body()!!
+
+                        // Filtra i badge che l'utente possiede
+                        val userBadgeIds = userBadgesList.map { it.badgeId }
+                        userBadges.value = allBadges.filter { it.id in userBadgeIds }
+                    }
+                }
+            } catch (e: Exception) {
+                // In caso di errore, usa badge di demo
+                userBadges.value = listOf(
+                    Badge(1, "Eco Starter", "Hai completato il primo quiz", ""),
+                    Badge(2, "Green Thumb", "Hai piantato il tuo primo albero virtuale", "")
+                )
+            }
+        }
+    }
+
+    /**
+     * Imposta la tab corrente
+     */
+    fun setCurrentTab(tabIndex: Int) {
+        currentTab.value = tabIndex
+    }
+
+    /**
+     * Nasconde il banner dei giochi
+     */
+    fun hideGamesBanner() {
+        showGamesBanner.value = false
+    }
+
+    /**
+     * Crea una nuova classe
+     */
+    fun createClass(newClass: ClassRoom) {
+        viewModelScope.launch {
+            val token = UserSession.getAuthHeader()
+            if (token != null) {
+                try {
+                    val userId = UserSession.getUserId()
+                    if (userId != null) {
+                        // Crea un oggetto gruppo
+                        val group = Group(
+                            name = newClass.name,
+                            description = null,
+                            ownerId = userId
+                        )
+
+                        // Chiamata API per creare il gruppo
+                        val response = apiService.createGroup(group, token)
+                        if (response.isSuccessful && response.body() != null) {
+                            // Ricarica i gruppi
+                            loadGroups()
+                        }
+                    }
+                } catch (e: Exception) {
+                    // Fallback a operazione locale se l'API fallisce
+                    classes.value = classes.value + newClass
+                }
+            } else {
+                // Fallback locale
+                classes.value = classes.value + newClass
+            }
+        }
+    }
+
+    /**
+     * Unisciti a una classe
+     */
+    fun joinClass(classRoom: ClassRoom) {
+        viewModelScope.launch {
+            val token = UserSession.getAuthHeader()
+            if (token != null) {
+                try {
+                    val userId = UserSession.getUserId()
+                    if (userId != null) {
+                        // In un'app reale, qui faresti una chiamata API per unirsi al gruppo
+                        // Per ora, simuliamo l'operazione
+                    }
+                } catch (e: Exception) {
+                    // Gestione errore
+                }
+            }
+        }
+    }
+
+    /**
+     * Effettua il logout
+     */
+    fun logout() {
+        UserSession.clear()
+    }
+}
 
 // Data Models
 data class ClassRoom(
@@ -104,63 +376,9 @@ data class Game(
 )
 
 // ViewModel
-class MainScreenViewModel : ViewModel() {
-    // User data
-    var userName = mutableStateOf("John Doe")
-    var userEmail = mutableStateOf("john.doe@example.com")
-    var userPoints = mutableStateOf(1250)
-    var userLevel = mutableStateOf("Eco Warrior")
 
-    // UI states
-    var isLoading = mutableStateOf(true)
-    var classes = mutableStateOf<List<ClassRoom>>(emptyList())
-    var availableGames = mutableStateOf<List<Game>>(emptyList())
-    var showGamesBanner = mutableStateOf(true)
-    var currentTab = mutableStateOf(0)
-    var hasNotifications = mutableStateOf(true)
-    var notificationCount = mutableStateOf(3)
-
-    init {
-        loadInitialData()
-    }
-
-    private fun loadInitialData() {
-        // This would be API calls in a real app
-        classes.value = listOf(
-            ClassRoom("Eco Science 101", R.drawable.happy_green_logo, "Prof. Smith"),
-            ClassRoom("Environmental Studies", R.drawable.happy_green_logo, "Prof. Johnson"),
-            ClassRoom("Green Technologies", R.drawable.happy_green_logo, "Prof. Martinez"),
-            ClassRoom("Sustainable Development", R.drawable.happy_green_logo, "Prof. Garcia")
-        )
-
-        availableGames.value = listOf(
-            Game("eco_detective", "Eco Detective", "Smista i rifiuti nei cestini corretti", R.drawable.happy_green_logo),
-            Game("eco_sfida", "Eco Sfida", "Confronta l'impatto ambientale", R.drawable.happy_green_logo),
-            Game("tree_planter", "Tree Planter", "Simulatore di piantumazione", R.drawable.tree_planter_game_logo)
-        )
-
-        isLoading.value = false
-    }
-
-    fun setCurrentTab(tabIndex: Int) {
-        currentTab.value = tabIndex
-    }
-
-    fun hideGamesBanner() {
-        showGamesBanner.value = false
-    }
-
-    fun createClass(newClass: ClassRoom) {
-        classes.value = classes.value + newClass
-    }
-
-    fun joinClass(classRoom: ClassRoom) {
-        // This would make an API call in a real app
-    }
-}
 
 // Main Screen
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
     volumeLevel: Float = 0.5f,
@@ -176,6 +394,14 @@ fun MainScreen(
     val gamesList by viewModel.availableGames
     val hasNotifications by viewModel.hasNotifications
     val notificationCount by viewModel.notificationCount
+    val errorMessage by viewModel.errorMessage
+
+    // User data from ViewModel
+    val userName by viewModel.userName
+    val userEmail by viewModel.userEmail
+    val userPoints by viewModel.userPoints
+    val userLevel by viewModel.userLevel
+    val userBadges by viewModel.userBadges
 
     // Local dialog states
     var showProfileDialog by remember { mutableStateOf(false) }
@@ -190,10 +416,24 @@ fun MainScreen(
     val icons = listOf(
         Icons.Default.Home,
         Icons.Default.Search,
-        Icons.Default.CropFree,  // Nuova icona per scanner barcode
+        Icons.Default.CropFree,
         Icons.Default.Person
     )
     val coroutineScope = rememberCoroutineScope()
+
+    // Error message dialog
+    if (errorMessage != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.errorMessage.value = null },
+            title = { Text("Errore") },
+            text = { Text(errorMessage!!) },
+            confirmButton = {
+                Button(onClick = { viewModel.errorMessage.value = null }) {
+                    Text("OK")
+                }
+            }
+        )
+    }
 
     // Game screens e Classroom Screen
     when {
@@ -213,6 +453,18 @@ fun MainScreen(
             classList = classList,
             showGamesBanner = showGamesBanner,
             gamesList = gamesList,
+            userName = userName,
+            userEmail = userEmail,
+            userPoints = userPoints,
+            userLevel = userLevel,
+            userBadges = userBadges.map { badge ->
+                BadgeItem(
+                    id = badge.id,
+                    name = badge.name,
+                    description = badge.description,
+                    iconUrl = badge.iconUrl
+                )
+            },
             onTabSelected = viewModel::setCurrentTab,
             onProfileClick = { showProfileDialog = true },
             onCreateClassClick = { showCreateClassDialog = true },
@@ -232,14 +484,264 @@ fun MainScreen(
     // Dialogs
     if (showProfileDialog) {
         ProfileDialog(
+            userName = userName,
+            userEmail = userEmail,
+            userPoints = userPoints,
+            userLevel = userLevel,
             volumeLevel = volumeLevel,
             onVolumeChange = onVolumeChange,
             onDismiss = { showProfileDialog = false },
             onLogout = {
                 showProfileDialog = false
+                viewModel.logout()
                 onLogout()
             }
         )
+    }
+    @Composable
+    fun CreateClassDialog(
+        onDismiss: () -> Unit,
+        onClassCreated: (ClassRoom) -> Unit
+    ) {
+        var className by remember { mutableStateOf("") }
+        var selectedBackgroundIndex by remember { mutableStateOf(0) }
+        var showBackgroundOptions by remember { mutableStateOf(false) }
+
+        // Background options (would be different images in a real app)
+        val backgroundOptions = listOf(
+            R.drawable.pattern_1,
+            R.drawable.pattern_2,
+            R.drawable.pattern_3,
+            R.drawable.pattern_4
+        )
+
+        Dialog(onDismissRequest = onDismiss) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Crea Nuova Classe",
+                            style = MaterialTheme.typography.titleLarge
+                        )
+
+                        IconButton(onClick = onDismiss) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Chiudi"
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Class name input
+                    OutlinedTextField(
+                        value = className,
+                        onValueChange = { className = it },
+                        label = { Text("Nome Classe") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Background selection
+                    Text(
+                        text = "Scegli Sfondo",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Background preview
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(100.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { showBackgroundOptions = true }
+                    ) {
+                        Image(
+                            painter = painterResource(id = backgroundOptions[selectedBackgroundIndex]),
+                            contentDescription = "Sfondo Selezionato",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.2f))
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Tocca per cambiare sfondo",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    // Background dropdown con griglia 2x2 di dimensioni ridotte
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center  // Centra il dropdown
+                    ) {
+                        DropdownMenu(
+                            expanded = showBackgroundOptions,
+                            onDismissRequest = { showBackgroundOptions = false },
+                            modifier = Modifier.width(240.dp)  // Larghezza fissa più contenuta
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .padding(8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                // Prima riga (2 elementi)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    // Primo sfondo
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .size(90.dp)  // Dimensione fissa più piccola
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable {
+                                                selectedBackgroundIndex = 0
+                                                showBackgroundOptions = false
+                                            }
+                                    ) {
+                                        Image(
+                                            painter = painterResource(id = backgroundOptions[0]),
+                                            contentDescription = null,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    }
+
+                                    // Secondo sfondo
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .size(90.dp)  // Dimensione fissa più piccola
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable {
+                                                selectedBackgroundIndex = 1
+                                                showBackgroundOptions = false
+                                            }
+                                    ) {
+                                        Image(
+                                            painter = painterResource(id = backgroundOptions[1]),
+                                            contentDescription = null,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))  // Spazio tra le righe aumentato
+
+                                // Seconda riga (2 elementi)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    // Terzo sfondo
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .size(90.dp)  // Dimensione fissa più piccola
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable {
+                                                selectedBackgroundIndex = 2
+                                                showBackgroundOptions = false
+                                            }
+                                    ) {
+                                        Image(
+                                            painter = painterResource(id = backgroundOptions[2]),
+                                            contentDescription = null,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    }
+
+                                    // Quarto sfondo
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .size(90.dp)  // Dimensione fissa più piccola
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable {
+                                                selectedBackgroundIndex = 3
+                                                showBackgroundOptions = false
+                                            }
+                                    ) {
+                                        Image(
+                                            painter = painterResource(id = backgroundOptions[3]),
+                                            contentDescription = null,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Create button
+                    Button(
+                        onClick = {
+                            if (className.isNotBlank()) {
+                                val newClass = ClassRoom(
+                                    name = className,
+                                    backgroundImageId = backgroundOptions[selectedBackgroundIndex]
+                                )
+                                onClassCreated(newClass)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = className.isNotBlank(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Green600,
+                            disabledContainerColor = Green100
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Crea Classe")
+                    }
+                }
+            }
+        }
     }
 
     if (showCreateClassDialog) {
@@ -252,6 +754,323 @@ fun MainScreen(
                 }
             }
         )
+    }
+}
+
+// Data model for badges in UI
+data class BadgeItem(
+    val id: Int,
+    val name: String,
+    val description: String,
+    val iconUrl: String
+)
+
+@Composable
+fun GameCard(
+    game: Game,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(180.dp)
+            .clickable(onClick = onClick),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
+            // Immagine del gioco (dimensione aumentata)
+            Box(
+                modifier = Modifier
+                    .size(140.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Green100),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(id = game.iconId),
+                    contentDescription = game.name,
+                    modifier = Modifier.size(100.dp),
+                    contentScale = ContentScale.Fit
+                )
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            // Dettagli del gioco
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = game.name,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 22.sp // Dimensione testo aumentata
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = game.description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.Gray,
+                    fontSize = 16.sp // Dimensione testo aumentata
+                )
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                // Pulsante Gioca (dimensione aumentata)
+                Button(
+                    onClick = onClick,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Green600
+                    ),
+                    modifier = Modifier
+                        .align(Alignment.End)
+                        .height(48.dp), // Altezza aumentata
+                    shape = RoundedCornerShape(24.dp) // Bordi più arrotondati
+                ) {
+                    Text(
+                        "Gioca",
+                        fontSize = 16.sp,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+
+@Composable
+fun GamesScreen(
+    games: List<Game>,
+    onGameSelected: (String) -> Unit,
+    onBack: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
+    ) {
+        // Barra superiore personalizzata con padding maggiore
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Green600)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 42.dp, bottom = 12.dp, start = 16.dp, end = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Icona indietro
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Indietro",
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                // Titolo
+                Text(
+                    text = "Giochi Eco-friendly",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 24.sp
+                )
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                // Icona giochi (aggiunta vicino al titolo)
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.2f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SportsEsports,
+                        contentDescription = "Giochi",
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+            }
+        }
+
+        // Contenuto con padding maggiore
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp), // Padding aumentato
+            verticalArrangement = Arrangement.spacedBy(24.dp) // Spazio tra gli elementi aumentato
+        ) {
+            item {
+                Text(
+                    text = "Scegli un gioco per divertirti e imparare",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Green800,
+                    fontSize = 18.sp // Dimensione testo aumentata
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            items(games) { game ->
+                GameCard(
+                    game = game,
+                    onClick = { onGameSelected(game.id) }
+                )
+            }
+
+            // Aggiungi spazio extra in fondo
+            item {
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+        }
+    }
+}
+
+
+
+@Composable
+fun MainAppScaffold(
+    currentTab: Int,
+    tabItems: List<String>,
+    icons: List<ImageVector>,
+    hasNotifications: Boolean,
+    notificationCount: Int,
+    isLoading: Boolean,
+    classList: List<ClassRoom>,
+    showGamesBanner: Boolean,
+    gamesList: List<Game>,
+    userName: String,
+    userEmail: String,
+    userPoints: Int,
+    userLevel: String,
+    userBadges: List<BadgeItem>,
+    onTabSelected: (Int) -> Unit,
+    onProfileClick: () -> Unit,
+    onCreateClassClick: () -> Unit,
+    onClassSelected: (ClassRoom) -> Unit,
+    onGameSelected: (String) -> Unit,
+    onHideGamesBanner: () -> Unit
+) {
+    var showEcoAIChat by remember { mutableStateOf(false) }
+    var showBarcodeScanner by remember { mutableStateOf(false) }
+    var showGamesScreen by remember { mutableStateOf(false) }
+
+    if (showEcoAIChat) {
+        EcoAIChatScreen(onBack = { showEcoAIChat = false })
+    } else if (showBarcodeScanner) {
+        BarcodeScannerScreen(onBack = { showBarcodeScanner = false })
+    } else if (showGamesScreen) {
+        GamesScreen(
+            games = gamesList,
+            onGameSelected = { gameId ->
+                showGamesScreen = false
+                onGameSelected(gameId)
+            },
+            onBack = { showGamesScreen = false }
+        )
+    } else {
+        Scaffold(
+            topBar = {
+                AppTopBar(
+                    onProfileClick = onProfileClick,
+                    onGamesClick = { showGamesScreen = true },
+                    hasNotifications = hasNotifications,
+                    notificationCount = notificationCount
+                )
+            },
+            bottomBar = {
+                NavigationBar {
+                    tabItems.forEachIndexed { index, item ->
+                        NavigationBarItem(
+                            icon = { Icon(icons[index], contentDescription = item) },
+                            label = { Text(item) },
+                            selected = currentTab == index,
+                            onClick = {
+                                // Gestione speciale per il tab scanner
+                                if (index == 2) { // Scanner tab
+                                    showBarcodeScanner = true
+                                } else {
+                                    onTabSelected(index)
+                                }
+                            }
+                        )
+                    }
+                }
+            },
+            floatingActionButton = {
+                Column(horizontalAlignment = Alignment.End) {
+                    FloatingActionButton(
+                        onClick = { showEcoAIChat = true },
+                        containerColor = Color(0xFF009688),
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ChatBubble,
+                            contentDescription = "Chiedi a EcoAI",
+                            tint = Color.White
+                        )
+                    }
+
+                    if (currentTab == 0) {
+                        FloatingActionButton(
+                            onClick = onCreateClassClick,
+                            containerColor = Green600
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Crea Classe",
+                                tint = Color.White
+                            )
+                        }
+                    }
+                }
+            }
+        ) { innerPadding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .background(Color.White)
+            ) {
+                // Contenuto principale
+                when {
+                    isLoading -> CenteredLoader(message = "Caricamento in corso...")
+                    else -> {
+                        when (currentTab) {
+                            0 -> HomeContent(classList = classList, onClassSelected = onClassSelected)
+                            1 -> ExploreContent()
+                            3 -> ProfileContent(
+                                userName = userName,
+                                userEmail = userEmail,
+                                userPoints = userPoints,
+                                userLevel = userLevel,
+                                userBadges = userBadges
+                            )
+                            else -> HomeContent(classList = classList, onClassSelected = onClassSelected)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -768,8 +1587,15 @@ fun ActivityCard(
         }
     }
     // Profile Content
+// Updated ProfileContent to use real user data
     @Composable
-    fun ProfileContent() {
+    fun ProfileContent(
+        userName: String,
+        userEmail: String,
+        userPoints: Int,
+        userLevel: String,
+        userBadges: List<BadgeItem>
+    ) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -796,12 +1622,12 @@ fun ActivityCard(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "John Doe",
+                    text = userName,
                     style = MaterialTheme.typography.titleLarge
                 )
 
                 Text(
-                    text = "john.doe@example.com",
+                    text = userEmail,
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.Gray
                 )
@@ -811,7 +1637,7 @@ fun ActivityCard(
 
             item {
                 // Points card
-                PointsCard(points = 1250, level = "Eco Warrior")
+                PointsCard(points = userPoints, level = userLevel)
                 Spacer(modifier = Modifier.height(24.dp))
             }
 
@@ -819,7 +1645,18 @@ fun ActivityCard(
                 // Badges section
                 SectionHeader(title = "Le mie badge")
                 Spacer(modifier = Modifier.height(8.dp))
-                BadgesRow()
+
+                if (userBadges.isEmpty()) {
+                    Text(
+                        text = "Non hai ancora guadagnato nessuna badge",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(vertical = 12.dp)
+                    )
+                } else {
+                    BadgesRow(badges = userBadges)
+                }
+
                 Spacer(modifier = Modifier.height(24.dp))
             }
 
@@ -833,150 +1670,57 @@ fun ActivityCard(
         }
     }
 
-// Dialogs
-    @Composable
-    fun ProfileDialog(
-        volumeLevel: Float,
-        onVolumeChange: (Float) -> Unit,
-        onDismiss: () -> Unit,
-        onLogout: () -> Unit
-    ) {
-        Dialog(onDismissRequest = onDismiss) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        IconButton(onClick = onDismiss) {
-                            Icon(Icons.Default.Close, contentDescription = "Chiudi")
-                        }
-                    }
-
-                    // Avatar
-                    Box(
-                        modifier = Modifier
-                            .size(120.dp)
-                            .clip(CircleShape)
-                            .background(Color.LightGray)
-                            .border(2.dp, Green600, CircleShape)
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.happy_green_logo),
-                            contentDescription = "Immagine Profilo",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = "John Doe",
-                        style = MaterialTheme.typography.titleLarge
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = "john.doe@example.com",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Gray
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Points card
-                    PointsCard(points = 1250, level = "Eco Warrior")
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Volume control
-                    Text(
-                        text = "Musica di sottofondo",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.VolumeOff,
-                            contentDescription = "Volume giù",
-                            tint = Green600
-                        )
-
-                        Slider(
-                            value = volumeLevel,
-                            onValueChange = onVolumeChange,
-                            modifier = Modifier.weight(1f),
-                            colors = SliderDefaults.colors(
-                                thumbColor = Green600,
-                                activeTrackColor = Green300,
-                                inactiveTrackColor = Green100
-                            )
-                        )
-
-                        Icon(
-                            imageVector = Icons.Default.VolumeUp,
-                            contentDescription = "Volume su",
-                            tint = Green600
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Logout button
-                    Button(
-                        onClick = onLogout,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Red.copy(alpha = 0.8f)
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Logout,
-                            contentDescription = null
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Logout")
-                    }
-                }
-            }
+@Composable
+fun BadgesRow(badges: List<BadgeItem>) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(badges.size) { index ->
+            val badge = badges[index]
+            BadgeItemUI(name = badge.name, iconId = R.drawable.happy_green_logo)
         }
     }
+}
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreateClassDialog(
+fun BadgeItemUI(name: String, iconId: Int) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.width(80.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(60.dp)
+                .clip(CircleShape)
+                .background(Green100)
+                .border(2.dp, Green300, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter = painterResource(id = iconId),
+                contentDescription = name,
+                modifier = Modifier.size(40.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = name,
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 1
+        )
+    }
+}
+
+// Updated ProfileDialog to use real user data
+@Composable
+fun ProfileDialog(
+    userName: String,
+    userEmail: String,
+    userPoints: Int,
+    userLevel: String,
+    volumeLevel: Float,
+    onVolumeChange: (Float) -> Unit,
     onDismiss: () -> Unit,
-    onClassCreated: (ClassRoom) -> Unit
+    onLogout: () -> Unit
 ) {
-    var className by remember { mutableStateOf("") }
-    var selectedBackgroundIndex by remember { mutableStateOf(0) }
-    var showBackgroundOptions by remember { mutableStateOf(false) }
-
-    // Background options (would be different images in a real app)
-    val backgroundOptions = listOf(
-        R.drawable.pattern_1,
-        R.drawable.pattern_2,
-        R.drawable.pattern_3,
-        R.drawable.pattern_4
-    )
-
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
@@ -990,555 +1734,106 @@ fun CreateClassDialog(
                 modifier = Modifier.padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    Text(
-                        text = "Crea Nuova Classe",
-                        style = MaterialTheme.typography.titleLarge
-                    )
-
                     IconButton(onClick = onDismiss) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Chiudi"
-                        )
+                        Icon(Icons.Default.Close, contentDescription = "Chiudi")
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Class name input
-                OutlinedTextField(
-                    value = className,
-                    onValueChange = { className = it },
-                    label = { Text("Nome Classe") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Background selection
-                Text(
-                    text = "Scegli Sfondo",
-                    style = MaterialTheme.typography.titleMedium
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Background preview
+                // Avatar
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(100.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { showBackgroundOptions = true }
+                        .size(120.dp)
+                        .clip(CircleShape)
+                        .background(Color.LightGray)
+                        .border(2.dp, Green600, CircleShape)
                 ) {
                     Image(
-                        painter = painterResource(id = backgroundOptions[selectedBackgroundIndex]),
-                        contentDescription = "Sfondo Selezionato",
+                        painter = painterResource(id = R.drawable.happy_green_logo),
+                        contentDescription = "Immagine Profilo",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
                     )
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.2f))
-                    )
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "Tocca per cambiare sfondo",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
                 }
 
-                // Background dropdown con griglia 2x2 di dimensioni ridotte
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.Center  // Centra il dropdown
-                ) {
-                    DropdownMenu(
-                        expanded = showBackgroundOptions,
-                        onDismissRequest = { showBackgroundOptions = false },
-                        modifier = Modifier.width(240.dp)  // Larghezza fissa più contenuta
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .padding(8.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            // Prima riga (2 elementi)
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                // Primo sfondo
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .size(90.dp)  // Dimensione fissa più piccola
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .clickable {
-                                            selectedBackgroundIndex = 0
-                                            showBackgroundOptions = false
-                                        }
-                                ) {
-                                    Image(
-                                        painter = painterResource(id = backgroundOptions[0]),
-                                        contentDescription = null,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.fillMaxSize()
-                                    )
-                                }
-
-                                // Secondo sfondo
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .size(90.dp)  // Dimensione fissa più piccola
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .clickable {
-                                            selectedBackgroundIndex = 1
-                                            showBackgroundOptions = false
-                                        }
-                                ) {
-                                    Image(
-                                        painter = painterResource(id = backgroundOptions[1]),
-                                        contentDescription = null,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.fillMaxSize()
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))  // Spazio tra le righe aumentato
-
-                            // Seconda riga (2 elementi)
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                // Terzo sfondo
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .size(90.dp)  // Dimensione fissa più piccola
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .clickable {
-                                            selectedBackgroundIndex = 2
-                                            showBackgroundOptions = false
-                                        }
-                                ) {
-                                    Image(
-                                        painter = painterResource(id = backgroundOptions[2]),
-                                        contentDescription = null,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.fillMaxSize()
-                                    )
-                                }
-
-                                // Quarto sfondo
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .size(90.dp)  // Dimensione fissa più piccola
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .clickable {
-                                            selectedBackgroundIndex = 3
-                                            showBackgroundOptions = false
-                                        }
-                                ) {
-                                    Image(
-                                        painter = painterResource(id = backgroundOptions[3]),
-                                        contentDescription = null,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.fillMaxSize()
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Create button
-                Button(
-                    onClick = {
-                        if (className.isNotBlank()) {
-                            val newClass = ClassRoom(
-                                name = className,
-                                backgroundImageId = backgroundOptions[selectedBackgroundIndex]
-                            )
-                            onClassCreated(newClass)
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = className.isNotBlank(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Green600,
-                        disabledContainerColor = Green100
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = null
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Crea Classe")
-                }
-            }
-        }
-    }
-}
-
-    // Helper components
-    @Composable
-    fun CenteredLoader(message: String) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                CircularProgressIndicator(
-                    color = Green600
-                )
                 Spacer(modifier = Modifier.height(16.dp))
+
                 Text(
-                    text = message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Green600
-                )
-            }
-        }
-    }
-@Composable
-fun GamesScreen(
-    games: List<Game>,
-    onGameSelected: (String) -> Unit,
-    onBack: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.White)
-    ) {
-        // Barra superiore personalizzata con padding maggiore
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Green600)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 42.dp, bottom = 12.dp, start = 16.dp, end = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Icona indietro
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Indietro",
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                // Titolo
-                Text(
-                    text = "Giochi Eco-friendly",
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 24.sp
-                )
-
-                Spacer(modifier = Modifier.weight(1f))
-
-                // Icona giochi (aggiunta vicino al titolo)
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.SportsEsports,
-                        contentDescription = "Giochi",
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-            }
-        }
-
-        // Contenuto con padding maggiore
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp), // Padding aumentato
-            verticalArrangement = Arrangement.spacedBy(24.dp) // Spazio tra gli elementi aumentato
-        ) {
-            item {
-                Text(
-                    text = "Scegli un gioco per divertirti e imparare",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Green800,
-                    fontSize = 18.sp // Dimensione testo aumentata
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-
-            items(games) { game ->
-                GameCard(
-                    game = game,
-                    onClick = { onGameSelected(game.id) }
-                )
-            }
-
-            // Aggiungi spazio extra in fondo
-            item {
-                Spacer(modifier = Modifier.height(24.dp))
-            }
-        }
-    }
-}
-
-@Composable
-fun GameCard(
-    game: Game,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(180.dp)
-            .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
-        ) {
-            // Immagine del gioco (dimensione aumentata)
-            Box(
-                modifier = Modifier
-                    .size(140.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Green100),
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    painter = painterResource(id = game.iconId),
-                    contentDescription = game.name,
-                    modifier = Modifier.size(100.dp),
-                    contentScale = ContentScale.Fit
-                )
-            }
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            // Dettagli del gioco
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = game.name,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 22.sp // Dimensione testo aumentata
+                    text = userName,
+                    style = MaterialTheme.typography.titleLarge
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = game.description,
+                    text = userEmail,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.Gray,
-                    fontSize = 16.sp // Dimensione testo aumentata
+                    color = Color.Gray
                 )
 
-                Spacer(modifier = Modifier.weight(1f))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // Pulsante Gioca (dimensione aumentata)
-                Button(
-                    onClick = onClick,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Green600
-                    ),
+                // Points card
+                PointsCard(points = userPoints, level = userLevel)
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Volume control
+                Text(
+                    text = "Musica di sottofondo",
+                    style = MaterialTheme.typography.titleMedium
+                )
+
+                Row(
                     modifier = Modifier
-                        .align(Alignment.End)
-                        .height(48.dp), // Altezza aumentata
-                    shape = RoundedCornerShape(24.dp) // Bordi più arrotondati
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        "Gioca",
-                        fontSize = 16.sp,
-                        modifier = Modifier.padding(horizontal = 8.dp)
+                    Icon(
+                        imageVector = Icons.Default.VolumeOff,
+                        contentDescription = "Volume giù",
+                        tint = Green600
+                    )
+
+                    Slider(
+                        value = volumeLevel,
+                        onValueChange = onVolumeChange,
+                        modifier = Modifier.weight(1f),
+                        colors = SliderDefaults.colors(
+                            thumbColor = Green600,
+                            activeTrackColor = Green300,
+                            inactiveTrackColor = Green100
+                        )
+                    )
+
+                    Icon(
+                        imageVector = Icons.Default.VolumeUp,
+                        contentDescription = "Volume su",
+                        tint = Green600
                     )
                 }
-            }
-        }
-    }
-}
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun MainAppScaffold(
-    currentTab: Int,
-    tabItems: List<String>,
-    icons: List<ImageVector>,
-    hasNotifications: Boolean,
-    notificationCount: Int,
-    isLoading: Boolean,
-    classList: List<ClassRoom>,
-    showGamesBanner: Boolean,
-    gamesList: List<Game>,
-    onTabSelected: (Int) -> Unit,
-    onProfileClick: () -> Unit,
-    onCreateClassClick: () -> Unit,
-    onClassSelected: (ClassRoom) -> Unit,
-    onGameSelected: (String) -> Unit,
-    onHideGamesBanner: () -> Unit
-) {
-    var showEcoAIChat by remember { mutableStateOf(false) }
-    var showBarcodeScanner by remember { mutableStateOf(false) }
-    var showGamesScreen by remember { mutableStateOf(false) }
+                Spacer(modifier = Modifier.height(16.dp))
 
-    if (showEcoAIChat) {
-        EcoAIChatScreen(onBack = { showEcoAIChat = false })
-    } else if (showBarcodeScanner) {
-        BarcodeScannerScreen(onBack = { showBarcodeScanner = false })
-    } else if (showGamesScreen) {
-        GamesScreen(
-            games = gamesList,
-            onGameSelected = { gameId ->
-                showGamesScreen = false
-                onGameSelected(gameId)
-            },
-            onBack = { showGamesScreen = false }
-        )
-    } else {
-        Scaffold(
-            topBar = {
-                AppTopBar(
-                    onProfileClick = onProfileClick,
-                    onGamesClick = { showGamesScreen = true },
-                    hasNotifications = hasNotifications,
-                    notificationCount = notificationCount
-                )
-            },
-            // Rest of the code remains the same...
-            bottomBar = {
-                NavigationBar {
-                    tabItems.forEachIndexed { index, item ->
-                        NavigationBarItem(
-                            icon = { Icon(icons[index], contentDescription = item) },
-                            label = { Text(item) },
-                            selected = currentTab == index,
-                            onClick = {
-                                // Gestione speciale per il tab scanner
-                                if (index == 2) { // Scanner tab
-                                    showBarcodeScanner = true
-                                } else {
-                                    onTabSelected(index)
-                                }
-                            }
-                        )
-                    }
+                // Logout button
+                Button(
+                    onClick = onLogout,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.Red.copy(alpha = 0.8f)
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Logout,
+                        contentDescription = null
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Logout")
                 }
-            },
-            floatingActionButton = {
-                Column(horizontalAlignment = Alignment.End) {
-                    FloatingActionButton(
-                        onClick = { showEcoAIChat = true },
-                        containerColor = Color(0xFF009688),
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ChatBubble,
-                            contentDescription = "Chiedi a EcoAI",
-                            tint = Color.White
-                        )
-                    }
-
-                    if (currentTab == 0) {
-                        FloatingActionButton(
-                            onClick = onCreateClassClick,
-                            containerColor = Green600
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = "Crea Classe",
-                                tint = Color.White
-                            )
-                        }
-                    }
-                }
-            }
-        ) { innerPadding ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .background(Color.White)
-            ) {
-                // Contenuto principale
-                when {
-                    isLoading -> CenteredLoader(message = "Caricamento in corso...")
-                    else -> {
-                        when (currentTab) {
-                            0 -> HomeContent(classList = classList, onClassSelected = onClassSelected)
-                            1 -> ExploreContent()
-                            3 -> ProfileContent()  // Aggiornato l'indice perché ora abbiamo 4 tab
-                            else -> HomeContent(classList = classList, onClassSelected = onClassSelected)
-                        }
-                    }
-                }
-
-                // Rimuoviamo il banner perché ora abbiamo una schermata dedicata per i giochi
-                // Se lo vuoi mantenere, rimetti questo codice
-                /*
-                if (showGamesBanner) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .align(Alignment.BottomCenter)
-                    ) {
-                        GamesBanner(
-                            games = gamesList,
-                            onGameSelected = onGameSelected,
-                            onScanBarcode = { showBarcodeScanner = true },
-                            onDismiss = onHideGamesBanner
-                        )
-                    }
-                }
-                */
             }
         }
     }

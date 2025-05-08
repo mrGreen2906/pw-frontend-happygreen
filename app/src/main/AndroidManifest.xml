@@ -2,9 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-
+    <!-- Permessi necessari -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- ⬇️ QUI vanno i permessi -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -13,7 +13,7 @@
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 
     <application
-
+        android:name=".HappyGreenApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -23,18 +23,45 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Frontendhappygreen"
         tools:targetApi="31"
-        >
+        android:usesCleartextTraffic="true">
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:theme="@style/Theme.Frontendhappygreen">
+            android:theme="@style/Theme.Frontendhappygreen"
+            android:launchMode="singleTask">
+
+            <!-- Intent filter standard per avvio app -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- Intent filter per schema personalizzato happygreen:// -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="happygreen" android:host="verify-email" />
+            </intent-filter>
+
+            <!-- Intent filter per URL reali (opzionale) -->
+            <!-- Nota: sostituisci "example.com" con il tuo dominio effettivo prima di usare -->
+            <!--
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="example.com" />
+                <data android:pathPrefix="/verify-email" />
+            </intent-filter>
+            -->
+
         </activity>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="com.example.frontend_happygreen.fileprovider"
@@ -44,7 +71,8 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
-        <!-- ⬇️ QUI va il service audio -->
+
+        <!-- Service audio -->
         <service
             android:name=".audio.BackgroundAudioService"
             android:enabled="true"
