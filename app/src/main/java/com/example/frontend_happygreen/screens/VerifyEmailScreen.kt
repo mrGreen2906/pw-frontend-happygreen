@@ -283,8 +283,7 @@ fun VerifyOTPScreen(
         ) {
             Text("Non hai ricevuto il codice? Invia di nuovo")
         }
-
-        // ID utente mostrato per debug durante lo sviluppo
+        
         if (userId > 0) {
             Text(
                 text = "UserID: $userId",
