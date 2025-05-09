@@ -1,6 +1,7 @@
 package com.example.frontend_happygreen.games
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.*
@@ -28,8 +29,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.frontend_happygreen.R
+import com.example.frontend_happygreen.api.ApiService
+import com.example.frontend_happygreen.api.RetrofitClient
+import com.example.frontend_happygreen.api.UpdatePointsRequest
+import com.example.frontend_happygreen.data.UserSession
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -62,6 +68,9 @@ enum class QuestionType {
 
 // ViewModel per la logica di gioco
 class EcoGameViewModel : ViewModel() {
+
+    private val apiService = RetrofitClient.create(ApiService::class.java)
+
     // Database dei rifiuti con fatti educativi
     private val wasteDatabase = listOf(
         Waste(
@@ -256,6 +265,42 @@ class EcoGameViewModel : ViewModel() {
 
     init {
         startNewRound()
+    }
+
+    /**
+     * Invia il punteggio al server quando il gioco termina
+     */
+    fun sendScoreToServer(onSuccess: (Int) -> Unit, onError: (String) -> Unit = {}) {
+        val gameId = "eco_sfida"
+        val scoreToSend = currentScore.value
+
+        viewModelScope.launch {
+            try {
+                val token = UserSession.getAuthHeader() ?: run {
+                    onError("Non sei autenticato")
+                    return@launch
+                }
+
+                val request = UpdatePointsRequest(
+                    points = scoreToSend,
+                    game_id = gameId
+                )
+
+                val response = apiService.updateUserPoints(token, request)
+
+                if (response.isSuccessful && response.body() != null) {
+                    // Aggiorna i punti dell'utente localmente
+                    val totalPoints = response.body()!!.total_points
+                    UserSession.setEcoPoints(totalPoints)
+                    onSuccess(totalPoints)
+                } else {
+                    onError("Errore nell'invio del punteggio: ${response.message()}")
+                }
+            } catch (e: Exception) {
+                Log.e("EcoGameViewModel", "Error sending score: ${e.message}")
+                onError("Errore di connessione: ${e.message}")
+            }
+        }
     }
 
     // Inizia un nuovo round
@@ -563,9 +608,6 @@ class EcoGameViewModel : ViewModel() {
     }
 }
 
-// Aggiungi questa chiusura mancante alla fine del file
-
-
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -624,6 +666,7 @@ fun EcoGameScreen(viewModel: EcoGameViewModel = viewModel()) {
                 score = currentScore,
                 onRestart = { viewModel.resetGame() },
                 onBack = { activity?.finish() },
+                viewModel = viewModel
             )
         } else {
             Box(modifier = Modifier.fillMaxSize()) {
@@ -1076,6 +1119,138 @@ fun TutorialOverlay(onDismiss: () -> Unit) {
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun GameOverScreen(
+    score: Int,
+    onRestart: () -> Unit,
+    onBack: () -> Unit,
+    viewModel: EcoGameViewModel = viewModel()
+) {
+    var totalPoints by remember { mutableStateOf<Int?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    // Invia il punteggio al server quando viene mostrata la schermata di Game Over
+    LaunchedEffect(Unit) {
+        viewModel.sendScoreToServer(
+            onSuccess = { points ->
+                totalPoints = points
+                isLoading = false
+            },
+            onError = { error ->
+                errorMessage = error
+                isLoading = false
+            }
+        )
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "Game Over",
+            style = MaterialTheme.typography.headlineLarge,
+            fontWeight = FontWeight.Bold,
+            color = EcoGreen
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text(
+            text = "Punteggio Finale",
+            style = MaterialTheme.typography.titleLarge,
+            color = Color.DarkGray
+        )
+
+        Text(
+            text = "$score",
+            style = MaterialTheme.typography.displayLarge,
+            fontWeight = FontWeight.Bold,
+            color = EcoGreen
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Mostra il motivo della sconfitta
+        Text(
+            text = viewModel.gameOverReason.value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.DarkGray,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Mostra i punti totali o l'errore
+        if (isLoading) {
+            CircularProgressIndicator(color = EcoGreen)
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("Aggiornamento punti in corso...", color = Color.Gray)
+        } else if (errorMessage != null) {
+            Text(
+                text = errorMessage!!,
+                color = EcoError,
+                textAlign = TextAlign.Center
+            )
+        } else {
+            // Card con i punti totali
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = EcoLightGreen
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Eco Points Totali",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = EcoGreen,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "$totalPoints",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = EcoGreen
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Pulsanti
+        Button(
+            onClick = onRestart,
+            colors = ButtonDefaults.buttonColors(containerColor = EcoGreen),
+            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Gioca ancora", fontSize = 18.sp, modifier = Modifier.padding(vertical = 8.dp))
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = onBack,
+            colors = ButtonDefaults.buttonColors(containerColor = Color.Gray),
+            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Torna alla Home", fontSize = 18.sp, modifier = Modifier.padding(vertical = 8.dp))
         }
     }
 }

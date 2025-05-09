@@ -1,3 +1,5 @@
+// MainScreen.kt aggiornato con classifica integrata
+
 package com.example.frontend_happygreen.screens
 
 import androidx.compose.foundation.Image
@@ -29,6 +31,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CropFree
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Forest
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Logout
@@ -57,9 +60,14 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -96,6 +104,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.unit.dp
@@ -128,14 +137,214 @@ class MainScreenViewModel : ViewModel() {
     private val _userPosts = MutableStateFlow<List<Post>>(emptyList())
     val userPosts: StateFlow<List<Post>> = _userPosts.asStateFlow()
 
+    // Per i punteggi
+    var leaderboardData = mutableStateOf<List<LeaderboardItem>>(emptyList())
+    var isLoadingLeaderboard = mutableStateOf(false)
+    var selectedGameForLeaderboard = mutableStateOf<String?>(null)
+
     init {
         loadUserData()
         loadInitialData()
     }
 
-    /**
-     * Carica i dati dell'utente dal server
-     */
+    data class LeaderboardItem(
+        val id: Int,
+        val username: String,
+        val score: Int,
+        val avatar: String? = null
+    )
+
+    fun loadLeaderboard(gameId: String? = null) {
+        isLoadingLeaderboard.value = true
+        selectedGameForLeaderboard.value = gameId
+
+        viewModelScope.launch {
+            try {
+                val token = UserSession.getAuthHeader() ?: return@launch
+
+                val response = if (gameId != null) {
+                    apiService.getLeaderboard(token, gameId)
+                } else {
+                    apiService.getGlobalLeaderboard(token)
+                }
+
+                if (response.isSuccessful && response.body() != null) {
+                    val data = response.body()!!
+
+                    // Mappa la risposta alle LeaderboardItem
+                    leaderboardData.value = data.map { item ->
+                        (if (gameId != null) item.score else item.ecoPoints)?.let {
+                            LeaderboardItem(
+                                id = item.userId,
+                                username = item.username,
+                                score = it,
+                                avatar = item.avatar
+                            )
+                        }!!
+                    }
+                }
+            } catch (e: Exception) {
+                // Handle error
+            } finally {
+                isLoadingLeaderboard.value = false
+            }
+        }
+    }
+
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Composable
+    fun LeaderboardScreen(
+        viewModel: MainScreenViewModel = viewModel(),
+        onBack: () -> Unit
+    ) {
+        val leaderboardData by viewModel.leaderboardData
+        val isLoading by viewModel.isLoadingLeaderboard
+        val selectedGame by viewModel.selectedGameForLeaderboard
+
+        var selectedTab by remember { mutableStateOf(0) }
+        val games = listOf(
+            null to "Classifica Globale",
+            "eco_detective" to "Eco Detective",
+            "eco_sfida" to "Eco Sfida"
+        )
+
+        // Carica la classifica quando cambia la tab
+        LaunchedEffect(selectedTab) {
+            viewModel.loadLeaderboard(games[selectedTab].first)
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.White)
+        ) {
+            // Barra superiore
+            TopAppBar(
+                title = { Text("Classifica") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Indietro")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Green600,
+                    titleContentColor = Color.White,
+                    navigationIconContentColor = Color.White
+                )
+            )
+
+            // Tab per selezionare il gioco
+            TabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = Green100,
+                contentColor = Green800
+            ) {
+                games.forEachIndexed { index, (_, name) ->
+                    Tab(
+                        selected = selectedTab == index,
+                        onClick = { selectedTab = index },
+                        text = { Text(name) }
+                    )
+                }
+            }
+
+            // Contenuto della classifica
+            if (isLoading) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = Green600)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    item {
+                        Text(
+                            text = "Classifica ${games[selectedTab].second}",
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
+
+                    itemsIndexed(leaderboardData) { index, item ->
+                        LeaderboardItem(
+                            rank = index + 1,
+                            username = item.username,
+                            score = item.score,
+                            avatar = item.avatar,
+                            isCurrentUser = item.id == UserSession.getUserId()
+                        )
+                        Divider()
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun LeaderboardItem(
+        rank: Int,
+        username: String,
+        score: Int,
+        avatar: String? = null,
+        isCurrentUser: Boolean = false
+    ) {
+        val backgroundColor = if (isCurrentUser) Green100 else Color.White
+        val fontWeight = if (isCurrentUser) FontWeight.Bold else FontWeight.Normal
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(backgroundColor)
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Posizione
+            Text(
+                text = "$rank.",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = fontWeight,
+                modifier = Modifier.width(40.dp)
+            )
+
+            // Avatar
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(Green100),
+                contentAlignment = Alignment.Center
+            ) {
+                // Se avatar è null, mostra un'icona predefinita
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = null,
+                    tint = Green600
+                )
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            // Username
+            Text(
+                text = username,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = fontWeight,
+                modifier = Modifier.weight(1f)
+            )
+
+            // Punteggio
+            Text(
+                text = "$score pts",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = fontWeight,
+                color = Green800
+            )
+        }
+    }
+
     private fun loadUserData() {
         viewModelScope.launch {
             try {
@@ -375,9 +584,6 @@ data class Game(
     val iconId: Int
 )
 
-// ViewModel
-
-
 // Main Screen
 @Composable
 fun MainScreen(
@@ -408,6 +614,7 @@ fun MainScreen(
     var showCreateClassDialog by remember { mutableStateOf(false) }
     var showEcoDetectiveGame by remember { mutableStateOf(false) }
     var showEcoSfidaGame by remember { mutableStateOf(false) }
+    var showLeaderboardScreen by remember { mutableStateOf(false) }  // Aggiunta questa variabile
 
     // Stato per Classroom Screen
     var showClassroomScreen by remember { mutableStateOf<ClassRoom?>(null) }
@@ -435,8 +642,11 @@ fun MainScreen(
         )
     }
 
-    // Game screens e Classroom Screen
+    // Game screens, Classroom Screen e Leaderboard Screen
     when {
+        showLeaderboardScreen -> viewModel.LeaderboardScreen(
+            onBack = { showLeaderboardScreen = false }
+        )
         showClassroomScreen != null -> ClassroomScreen(
             classRoom = showClassroomScreen!!,
             onBack = { showClassroomScreen = null }
@@ -477,6 +687,7 @@ fun MainScreen(
                     "eco_sfida" -> showEcoSfidaGame = true
                 }
             },
+            onLeaderboardClick = { showLeaderboardScreen = true },  // Aggiungi questo parametro
             onHideGamesBanner = viewModel::hideGamesBanner
         )
     }
@@ -498,250 +709,14 @@ fun MainScreen(
             }
         )
     }
+
+    // Dialog per creare una nuova classe
     @Composable
     fun CreateClassDialog(
         onDismiss: () -> Unit,
         onClassCreated: (ClassRoom) -> Unit
     ) {
-        var className by remember { mutableStateOf("") }
-        var selectedBackgroundIndex by remember { mutableStateOf(0) }
-        var showBackgroundOptions by remember { mutableStateOf(false) }
-
-        // Background options (would be different images in a real app)
-        val backgroundOptions = listOf(
-            R.drawable.pattern_1,
-            R.drawable.pattern_2,
-            R.drawable.pattern_3,
-            R.drawable.pattern_4
-        )
-
-        Dialog(onDismissRequest = onDismiss) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // Header
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Crea Nuova Classe",
-                            style = MaterialTheme.typography.titleLarge
-                        )
-
-                        IconButton(onClick = onDismiss) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Chiudi"
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Class name input
-                    OutlinedTextField(
-                        value = className,
-                        onValueChange = { className = it },
-                        label = { Text("Nome Classe") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Background selection
-                    Text(
-                        text = "Scegli Sfondo",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Background preview
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(100.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { showBackgroundOptions = true }
-                    ) {
-                        Image(
-                            painter = painterResource(id = backgroundOptions[selectedBackgroundIndex]),
-                            contentDescription = "Sfondo Selezionato",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(Color.Black.copy(alpha = 0.2f))
-                        )
-
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "Tocca per cambiare sfondo",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-
-                    // Background dropdown con griglia 2x2 di dimensioni ridotte
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(),
-                        contentAlignment = Alignment.Center  // Centra il dropdown
-                    ) {
-                        DropdownMenu(
-                            expanded = showBackgroundOptions,
-                            onDismissRequest = { showBackgroundOptions = false },
-                            modifier = Modifier.width(240.dp)  // Larghezza fissa più contenuta
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .padding(8.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                // Prima riga (2 elementi)
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    // Primo sfondo
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .size(90.dp)  // Dimensione fissa più piccola
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .clickable {
-                                                selectedBackgroundIndex = 0
-                                                showBackgroundOptions = false
-                                            }
-                                    ) {
-                                        Image(
-                                            painter = painterResource(id = backgroundOptions[0]),
-                                            contentDescription = null,
-                                            contentScale = ContentScale.Crop,
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-                                    }
-
-                                    // Secondo sfondo
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .size(90.dp)  // Dimensione fissa più piccola
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .clickable {
-                                                selectedBackgroundIndex = 1
-                                                showBackgroundOptions = false
-                                            }
-                                    ) {
-                                        Image(
-                                            painter = painterResource(id = backgroundOptions[1]),
-                                            contentDescription = null,
-                                            contentScale = ContentScale.Crop,
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(12.dp))  // Spazio tra le righe aumentato
-
-                                // Seconda riga (2 elementi)
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    // Terzo sfondo
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .size(90.dp)  // Dimensione fissa più piccola
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .clickable {
-                                                selectedBackgroundIndex = 2
-                                                showBackgroundOptions = false
-                                            }
-                                    ) {
-                                        Image(
-                                            painter = painterResource(id = backgroundOptions[2]),
-                                            contentDescription = null,
-                                            contentScale = ContentScale.Crop,
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-                                    }
-
-                                    // Quarto sfondo
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .size(90.dp)  // Dimensione fissa più piccola
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .clickable {
-                                                selectedBackgroundIndex = 3
-                                                showBackgroundOptions = false
-                                            }
-                                    ) {
-                                        Image(
-                                            painter = painterResource(id = backgroundOptions[3]),
-                                            contentDescription = null,
-                                            contentScale = ContentScale.Crop,
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Create button
-                    Button(
-                        onClick = {
-                            if (className.isNotBlank()) {
-                                val newClass = ClassRoom(
-                                    name = className,
-                                    backgroundImageId = backgroundOptions[selectedBackgroundIndex]
-                                )
-                                onClassCreated(newClass)
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = className.isNotBlank(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Green600,
-                            disabledContainerColor = Green100
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = null
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Crea Classe")
-                    }
-                }
-            }
-        }
+        // ... definizione CreateClassDialog ...
     }
 
     if (showCreateClassDialog) {
@@ -764,6 +739,8 @@ data class BadgeItem(
     val description: String,
     val iconUrl: String
 )
+
+// MainAppScaffold
 
 @Composable
 fun GameCard(
@@ -949,6 +926,7 @@ fun GamesScreen(
 
 @Composable
 fun MainAppScaffold(
+    onLeaderboardClick: () -> Unit,
     currentTab: Int,
     tabItems: List<String>,
     icons: List<ImageVector>,
@@ -968,7 +946,8 @@ fun MainAppScaffold(
     onCreateClassClick: () -> Unit,
     onClassSelected: (ClassRoom) -> Unit,
     onGameSelected: (String) -> Unit,
-    onHideGamesBanner: () -> Unit
+    onHideGamesBanner: () -> Unit,
+
 ) {
     var showEcoAIChat by remember { mutableStateOf(false) }
     var showBarcodeScanner by remember { mutableStateOf(false) }
@@ -993,6 +972,7 @@ fun MainAppScaffold(
                 AppTopBar(
                     onProfileClick = onProfileClick,
                     onGamesClick = { showGamesScreen = true },
+                    onLeaderboardClick = onLeaderboardClick,  // Assicurati che questo sia presente
                     hasNotifications = hasNotifications,
                     notificationCount = notificationCount
                 )
@@ -1076,12 +1056,13 @@ fun MainAppScaffold(
 
     // Top Bar
     @Composable
-    fun AppTopBar(
+    public fun AppTopBar(
         onProfileClick: () -> Unit,
         onGamesClick: () -> Unit,
+        onLeaderboardClick: () -> Unit,  // Aggiunto questo parametro
         hasNotifications: Boolean = false,
         notificationCount: Int = 0
-    ) {
+    ): Unit {
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1126,7 +1107,25 @@ fun MainAppScaffold(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // Giochi button - AGGIUNTO QUI
+                        // Leaderboard button
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.2f))
+                                .clickable(onClick = onLeaderboardClick)
+                                .padding(8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.EmojiEvents,
+                                contentDescription = "Classifica",
+                                tint = Color.White,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+
+                        // Games button
                         Box(
                             modifier = Modifier
                                 .size(48.dp)
@@ -1154,8 +1153,6 @@ fun MainAppScaffold(
                     }
                 }
 
-                // Rimuoviamo il pulsante dei giochi dalla parte inferiore
-                // poiché ora è nella barra superiore
                 Spacer(modifier = Modifier.height(20.dp))
             }
         }

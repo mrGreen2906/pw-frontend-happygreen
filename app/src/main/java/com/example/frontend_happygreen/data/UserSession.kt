@@ -153,4 +153,15 @@ object UserSession {
             preferences.edit { clear() }
         }
     }
+    fun setEcoPoints(points: Int) {
+        // Aggiorna il valore in memoria
+        this.ecoPoints = points
+
+        // Aggiorna nelle SharedPreferences
+        if (::preferences.isInitialized) {
+            preferences.edit {
+                putInt(KEY_ECO_POINTS, points)
+            }
+        }
+    }
 }

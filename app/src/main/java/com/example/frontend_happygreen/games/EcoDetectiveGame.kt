@@ -1,5 +1,6 @@
 package com.example.frontend_happygreen.games
 
+import android.util.Log
 import androidx.compose.animation.AnimatedVisibility as ComposeAnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.animation.fadeIn
@@ -9,7 +10,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -25,14 +25,19 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.frontend_happygreen.R
+import com.example.frontend_happygreen.data.UserSession
 import com.example.frontend_happygreen.ui.components.HappyGreenButton
 import com.example.frontend_happygreen.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.example.frontend_happygreen.api.ApiService
+import com.example.frontend_happygreen.api.RetrofitClient
+import com.example.frontend_happygreen.api.UpdatePointsRequest
+import kotlinx.coroutines.MainScope
 
 /**
  * Enumerazione per i tipi di rifiuto
@@ -130,7 +135,7 @@ class EcoDetectiveViewModel : ViewModel() {
 
     // Timer del gioco
     fun startTimer(onGameOver: () -> Unit) {
-        val timerJob = kotlinx.coroutines.MainScope().launch {
+        val timerJob = MainScope().launch {
             while (timeLeft > 0 && lives > 0) {
                 delay(1000)
                 timeLeft--
@@ -191,6 +196,37 @@ class EcoDetectiveViewModel : ViewModel() {
         showFeedback = false
         feedbackMessage = null
         currentWasteItem = allWasteItems.random()
+    }
+
+    // Aggiungiamo una funzione nel ViewModel per inviare i punti al server
+// Modifica la funzione sendScoreToServer in EcoDetectiveViewModel
+    fun sendScoreToServer(onSuccess: (Int) -> Unit) {
+        val gameId = "eco_detective"
+        val scoreToSend = score
+        val apiService = RetrofitClient.create(ApiService::class.java)
+        viewModelScope.launch {
+            try {
+                val token = UserSession.getAuthHeader() ?: return@launch
+
+                val response = apiService.updateUserPoints(
+                    token,
+                    UpdatePointsRequest(
+                        points = scoreToSend,
+                        game_id = gameId  // Nota che qui ho cambiato 'gameid' a 'game_id'
+                    )
+                )
+
+                if (response.isSuccessful && response.body() != null) {
+                    // Aggiorna i punti dell'utente localmente
+                    val totalPoints = response.body()!!.total_points  // Cambiato da totalPoints a total_points
+                    UserSession.setEcoPoints(totalPoints)
+                    onSuccess(totalPoints)
+                }
+            } catch (e: Exception) {
+                // Gestisci l'errore (potrebbe essere necessario aggiungere un callback di errore)
+                Log.e("EcoDetectiveViewModel", "Error sending score: ${e.message}")
+            }
+        }
     }
 }
 
@@ -265,7 +301,7 @@ fun EcoDetectiveGameScreen(
         ) {
             if (viewModel.gameState == GameState.GameOver) {
                 // Schermata di Game Over
-                GameOverScreen(
+                EcoSfidaGameOverScreen(
                     score = viewModel.score,
                     onRestart = { viewModel.resetGame() },
                     onBack = onBack
@@ -609,13 +645,24 @@ fun FeedbackMessageCard(message: FeedbackMessage) {
  * Schermata di Game Over
  */
 @Composable
-fun GameOverScreen(
+fun EcoSfidaGameOverScreen(
     score: Int,
     onRestart: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    viewModel: EcoDetectiveViewModel = viewModel()
 ) {
     // Effetto confetti per punteggi alti
     val showConfetti = score > 50
+    var totalPoints by remember { mutableStateOf<Int?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    // Invia il punteggio al server quando viene mostrata la schermata di Game Over
+    LaunchedEffect(Unit) {
+        viewModel.sendScoreToServer { points ->
+            totalPoints = points
+            isLoading = false
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -669,6 +716,38 @@ fun GameOverScreen(
         )
 
         Spacer(modifier = Modifier.height(24.dp))
+
+        // Mostra lo stato del caricamento o i punti totali
+        if (isLoading) {
+            CircularProgressIndicator(color = Green600)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Aggiornamento punti in corso...", color = Gray600)
+        } else {
+            // Card con i punti totali
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Green100),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Eco Points Totali",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Green800
+                    )
+
+                    Text(
+                        text = "$totalPoints",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Green600
+                    )
+                }
+            }
+        }
 
         // Messaggio basato sul punteggio
         val message = when {

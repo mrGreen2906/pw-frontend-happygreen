@@ -59,4 +59,41 @@ interface ApiService {
         @Path("userId") userId: Int,
         @Body codeMap: Map<String, String>
     ): Response<Map<String, Any>>
+
+    @GET("api/leaderboard/")
+    suspend fun getGlobalLeaderboard(
+        @Header("Authorization") token: String
+    ): Response<List<LeaderboardResponse>>
+
+    @GET("api/leaderboard/")
+    suspend fun getLeaderboard(
+        @Header("Authorization") token: String,
+        @Query("game_id") gameId: String
+    ): Response<List<LeaderboardResponse>>
+
+    @POST("api/user/update-points/")
+    suspend fun updateUserPoints(
+        @Header("Authorization") token: String,
+        @Body request: UpdatePointsRequest
+    ): Response<UpdatePointsResponse>
 }
+
+// Classi per le richieste e risposte
+data class UpdatePointsRequest(
+    val points: Int,
+    val game_id: String  // Modificato per match con il backend
+)
+
+data class UpdatePointsResponse(
+    val success: Boolean,
+    val message: String,
+    val total_points: Int  // Modificato per match con il backend
+)
+
+data class LeaderboardResponse(
+    val userId: Int,
+    val username: String,
+    val score: Int? = null,  // Per classifiche di gioco specifiche
+    val ecoPoints: Int? = null,  // Per classifica globale
+    val avatar: String? = null
+)
