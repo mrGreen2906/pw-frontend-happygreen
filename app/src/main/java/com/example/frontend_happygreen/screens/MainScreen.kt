@@ -1818,7 +1818,10 @@ fun ProfileDialog(
 
                 // Logout button
                 Button(
-                    onClick = onLogout,
+                    onClick = {
+                        onLogout()
+                        onDismiss()
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color.Red.copy(alpha = 0.8f)
@@ -1831,7 +1834,9 @@ fun ProfileDialog(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Logout")
                 }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Logout")
+                }
             }
         }
     }
-}
