@@ -89,10 +89,6 @@ fun HappyGreenApp(
     var userId by remember { mutableStateOf<Int?>(null) }
 
     // Usiamo un effetto che esegue solo all'avvio
-    LaunchedEffect(Unit) {
-        // Pulisci completamente le credenziali all'avvio
-        UserSession.clear()
-    }
 
     // FLUSSO PRINCIPALE DELL'APP
     when (currentScreen) {

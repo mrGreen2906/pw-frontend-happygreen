@@ -141,10 +141,24 @@ class MainScreenViewModel : ViewModel() {
     private var leaderboardInitialized = false
 
     init {
-        loadUserData()
-        loadInitialData()
-        // Carica immediatamente la classifica globale all'avvio
-        loadLeaderboard()
+        viewModelScope.launch {
+            UserSession.isLoggedInFlow.collect { isLoggedIn ->
+                if (isLoggedIn) {
+                    // Quando l'utente effettua l'accesso, ricarica i dati
+                    loadUserData()
+                    loadInitialData()
+                    loadLeaderboard()
+                }
+            }
+        }
+    }
+
+    fun refreshData() {
+        viewModelScope.launch {
+            loadUserData()
+            loadInitialData()
+            loadLeaderboard()
+        }
     }
 
     data class LeaderboardItems(
@@ -155,7 +169,7 @@ class MainScreenViewModel : ViewModel() {
         val isCurrentUser: Boolean = false
     )
 
-    fun loadLeaderboard(gameId: String? = null) {
+    private fun loadLeaderboard(gameId: String? = null) {
         isLoadingLeaderboard.value = true
         selectedGameForLeaderboard.value = gameId
         errorMessage.value = null // Reset eventuali messaggi di errore precedenti
@@ -437,12 +451,34 @@ class MainScreenViewModel : ViewModel() {
 
                         // Carica anche notifiche
                         checkNotifications()
+                    } else if (response.code() == 401) {
+                        // Token non valido, forse scaduto
+                        errorMessage.value = "Sessione scaduta. Effettua nuovamente l'accesso."
+                        // In questo caso potremmo anche reindirizzare l'utente al login
+                    } else {
+                        errorMessage.value = "Errore nel caricamento dei dati: ${response.code()}"
+                        // Prova a usare i dati memorizzati localmente
+                        fallbackToLocalUserData()
                     }
+                } else {
+                    // Nessun token, usa i dati memorizzati se disponibili
+                    fallbackToLocalUserData()
                 }
             } catch (e: Exception) {
-                errorMessage.value = "Errore nel caricamento dei dati utente: ${e.message}"
+                errorMessage.value = "Errore di connessione: ${e.message}"
+                // In caso di errore di rete, usa i dati memorizzati localmente
+                fallbackToLocalUserData()
             }
         }
+    }
+
+    // Metodo per utilizzare i dati locali in caso di problemi di rete
+    private fun fallbackToLocalUserData() {
+        // Utilizza i dati già memorizzati in UserSession
+        userName.value = UserSession.getFullName()
+        userEmail.value = UserSession.getEmail() ?: ""
+        userPoints.value = UserSession.getEcoPoints() ?: 0
+        userLevel.value = calculateLevel(userPoints.value)
     }
 
     /**
@@ -672,6 +708,11 @@ fun MainScreen(
     onLogout: () -> Unit = {},
     viewModel: MainScreenViewModel = viewModel()
 ) {
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshData()
+    }
+
     // States from ViewModel
     val currentTab by viewModel.currentTab
     val isLoading by viewModel.isLoading
