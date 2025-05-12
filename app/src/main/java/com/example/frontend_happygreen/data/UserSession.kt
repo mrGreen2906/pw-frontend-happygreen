@@ -45,13 +45,30 @@ object UserSession {
     private lateinit var preferences: SharedPreferences
 
     /**
+     * Verifica se l'utente ha un'autenticazione valida
+     */
+    fun hasValidAuthentication(): Boolean {
+        return token != null && userId != null && _isLoggedInFlow.value
+    }
+
+    /**
      * Inizializza la sessione utente dal contesto
      * Da chiamare all'avvio dell'applicazione (in Application o Activity principale)
      */
     fun init(context: Context) {
         preferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-        // Carica i dati dalle SharedPreferences
+        // Verifica se l'utente era precedentemente loggato
+        val storedLoggedIn = preferences.getBoolean(KEY_IS_LOGGED_IN, false)
+
+        // Se non era loggato, non c'è niente da caricare
+        if (!storedLoggedIn) {
+            _isLoggedInFlow.value = false
+            _userDataFlow.value = null
+            return
+        }
+
+        // Carica i dati solo se l'utente era precedentemente loggato
         token = preferences.getString(KEY_TOKEN, null)
         userId = preferences.getInt(KEY_USER_ID, -1).let { if (it == -1) null else it }
         username = preferences.getString(KEY_USERNAME, null)
@@ -61,12 +78,12 @@ object UserSession {
         avatar = preferences.getString(KEY_AVATAR, null)
         ecoPoints = preferences.getInt(KEY_ECO_POINTS, -1).let { if (it == -1) null else it }
 
-        // Aggiorna lo stato del login
-        val isLoggedIn = preferences.getBoolean(KEY_IS_LOGGED_IN, false) && token != null
-        _isLoggedInFlow.value = isLoggedIn
+        // Verifica se i dati essenziali sono presenti
+        val isValidSession = token != null && userId != null
 
-        // Se l'utente è loggato, popola lo userDataFlow
-        if (isLoggedIn && userId != null) {
+        if (isValidSession) {
+            // Se abbiamo una sessione valida, aggiorna gli StateFlow
+            _isLoggedInFlow.value = true
             _userDataFlow.value = UserData(
                 id = userId!!,
                 username = username ?: "",
@@ -76,6 +93,10 @@ object UserSession {
                 avatar = avatar,
                 ecoPoints = ecoPoints ?: 0
             )
+        } else {
+            // Se i dati sono corrotti o mancanti ma il flag era true,
+            // reimposta tutto per evitare uno stato incoerente
+            clear()
         }
     }
 
@@ -184,6 +205,7 @@ object UserSession {
      * Cancella la sessione utente (logout)
      */
     fun clear() {
+        // Reset di tutti i valori in memoria
         token = null
         userId = null
         username = null
@@ -193,17 +215,28 @@ object UserSession {
         avatar = null
         ecoPoints = null
 
-        // Pulisci dalle SharedPreferences
-        if (::preferences.isInitialized) {
-            preferences.edit(commit = true) {
-                clear()
-                putBoolean(KEY_IS_LOGGED_IN, false)
-            }
-        }
-
-        // Aggiorna i StateFlow
+        // Aggiornamento immediato degli stati di flusso
         _isLoggedInFlow.value = false
         _userDataFlow.value = null
+
+        // Pulizia completa delle SharedPreferences
+        if (::preferences.isInitialized) {
+            preferences.edit {
+                // Rimuovi esplicitamente ogni chiave
+                remove(KEY_TOKEN)
+                remove(KEY_USER_ID)
+                remove(KEY_USERNAME)
+                remove(KEY_EMAIL)
+                remove(KEY_FIRST_NAME)
+                remove(KEY_LAST_NAME)
+                remove(KEY_AVATAR)
+                remove(KEY_ECO_POINTS)
+                putBoolean(KEY_IS_LOGGED_IN, false) // Importante: imposta esplicitamente a false
+
+                // Assicurati che le modifiche vengano applicate immediatamente
+                commit()
+            }
+        }
     }
 
     fun setEcoPoints(points: Int) {

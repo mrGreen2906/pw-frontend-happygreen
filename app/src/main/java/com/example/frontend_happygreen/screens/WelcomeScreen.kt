@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.frontend_happygreen.R
+import com.example.frontend_happygreen.data.UserSession
 import com.example.frontend_happygreen.ui.theme.Green300
 import com.example.frontend_happygreen.ui.theme.Green600
 import com.example.frontend_happygreen.ui.theme.Green800
@@ -159,7 +160,10 @@ fun WelcomeScreen(onGetStartedClick: () -> Unit) {
 
             // Pulsante con animazione
             Button(
-                onClick = onGetStartedClick,
+                onClick = {
+                    // Assicuriamoci che l'utente non sia loggato automaticamente
+                    onGetStartedClick()
+                },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color.White
                 ),

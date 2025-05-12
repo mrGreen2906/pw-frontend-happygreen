@@ -81,64 +81,108 @@ fun HappyGreenApp(
     onVolumeChange: (Float) -> Unit = {},
     volumeLevel: Float = 0.5f
 ) {
-    // Usa lo stato di login da UserSession.isLoggedInFlow
-    val isLoggedIn by UserSession.isLoggedInFlow.collectAsState()
+    // Stato attuale dell'autenticazione
+    val isLoggedIn by UserSession.isLoggedInFlow.collectAsState(initial = false)
 
-    // Stato per tracciare il flusso dell'app
-    val (currentScreen, setCurrentScreen) = remember {
-        mutableStateOf<Screen>(if (isLoggedIn) Screen.Loading else Screen.Welcome)
-    }
+    // Stato della schermata
+    var currentScreen by remember { mutableStateOf<Screen>(Screen.Welcome) }
     var userId by remember { mutableStateOf<Int?>(null) }
 
-    // Importante: reagisci ai cambiamenti dello stato di login
-    LaunchedEffect(isLoggedIn) {
-        if (isLoggedIn) {
-            setCurrentScreen(Screen.Loading)
-        } else {
-            setCurrentScreen(Screen.Welcome)
-        }
+    // Usiamo un effetto che esegue solo all'avvio
+    LaunchedEffect(Unit) {
+        // Pulisci completamente le credenziali all'avvio
+        UserSession.clear()
     }
 
-    when (val screen = currentScreen) {
-        Screen.Welcome -> WelcomeScreen(
-            onGetStartedClick = { setCurrentScreen(Screen.Auth) }
-        )
+    // FLUSSO PRINCIPALE DELL'APP
+    when (currentScreen) {
+        Screen.Welcome -> {
+            WelcomeScreen(
+                onGetStartedClick = {
+                    // Qui forziamo il passaggio alla schermata Auth
+                    currentScreen = Screen.Auth
+                }
+            )
+        }
 
-        Screen.Auth -> AuthScreen(
-            onAuthComplete = {
-                setCurrentScreen(Screen.Loading)
-            },
-            onNeedVerification = { id ->
-                userId = id
-                setCurrentScreen(Screen.VerifyOTP)
+        Screen.Auth -> {
+            AuthScreen(
+                onAuthComplete = {
+                    // Se l'autenticazione è completata, passa alla schermata Loading
+                    if (isLoggedIn) {
+                        currentScreen = Screen.Loading
+                    }
+                },
+                onNeedVerification = { id ->
+                    userId = id
+                    currentScreen = Screen.VerifyOTP
+                }
+            )
+
+            // Se l'utente viene autenticato mentre è già nella schermata di auth
+            LaunchedEffect(isLoggedIn) {
+                if (isLoggedIn) {
+                    currentScreen = Screen.Loading
+                }
             }
-        )
-
-        Screen.Loading -> LoadingScreen(
-            onLoadingComplete = { setCurrentScreen(Screen.Main) }
-        )
-
-        Screen.Main -> MainScreen(
-            volumeLevel = volumeLevel,
-            onVolumeChange = onVolumeChange,
-            onLogout = {
-                // Esegui il logout e torna alla schermata di benvenuto
-                UserSession.clear()
-                setCurrentScreen(Screen.Welcome)
-            }
-        )
+        }
 
         Screen.VerifyOTP -> {
             userId?.let { id ->
                 VerifyOTPScreen(
                     userId = id,
                     onVerificationComplete = {
-                        setCurrentScreen(Screen.Loading)
+                        if (isLoggedIn) {
+                            currentScreen = Screen.Loading
+                        } else {
+                            // Se non siamo ancora loggati, torna alla schermata di auth
+                            currentScreen = Screen.Auth
+                        }
                     }
                 )
             } ?: run {
                 // Se userId è null, torna alla schermata di autenticazione
-                setCurrentScreen(Screen.Auth)
+                currentScreen = Screen.Auth
+            }
+
+            // Se l'utente viene autenticato durante la verifica
+            LaunchedEffect(isLoggedIn) {
+                if (isLoggedIn) {
+                    currentScreen = Screen.Loading
+                }
+            }
+        }
+
+        Screen.Loading -> {
+            // Verifica che l'utente sia effettivamente loggato
+            if (isLoggedIn) {
+                LoadingScreen(
+                    onLoadingComplete = { currentScreen = Screen.Main }
+                )
+            } else {
+                // Non sei loggato? Torna alla schermata di auth
+                LaunchedEffect(Unit) {
+                    currentScreen = Screen.Auth
+                }
+            }
+        }
+
+        Screen.Main -> {
+            // Verifica costantemente che l'utente sia loggato
+            if (isLoggedIn) {
+                MainScreen(
+                    volumeLevel = volumeLevel,
+                    onVolumeChange = onVolumeChange,
+                    onLogout = {
+                        UserSession.clear()
+                        currentScreen = Screen.Welcome
+                    }
+                )
+            } else {
+                // Non sei loggato? Torna alla schermata di welcome
+                LaunchedEffect(Unit) {
+                    currentScreen = Screen.Welcome
+                }
             }
         }
     }

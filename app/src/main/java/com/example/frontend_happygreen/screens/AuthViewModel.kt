@@ -45,9 +45,10 @@ class AuthViewModel : ViewModel() {
     init {
         // Verifica subito se l'utente è già loggato
         viewModelScope.launch {
+            // Leggi lo stato attuale dal flow
             isLoggedIn.value = UserSession.isLoggedInFlow.first()
 
-            // Se l'utente è già loggato ma non abbiamo i suoi dati aggiornati
+            // Se l'utente è già loggato, aggiorna i suoi dati
             if (isLoggedIn.value) {
                 refreshUserData()
             }
@@ -67,7 +68,7 @@ class AuthViewModel : ViewModel() {
                 UserSession.updateUserData(userData)
             } else {
                 // Se non riusciamo a ottenere i dati dell'utente, il token potrebbe essere scaduto
-                // Forziamo il logout per sicurezza
+                // Forziamo il logout solo se abbiamo un errore 401 (Unauthorized)
                 if (response.code() == 401) {
                     UserSession.clear()
                     isLoggedIn.value = false
@@ -75,6 +76,7 @@ class AuthViewModel : ViewModel() {
             }
         } catch (e: Exception) {
             // Errore di rete, non facciamo nulla e manteniamo i dati in cache
+            // Invece di forzare il logout, permettiamo all'utente di usare l'app offline
         }
     }
 
@@ -246,7 +248,10 @@ class AuthViewModel : ViewModel() {
      * Effettua il logout
      */
     fun logout() {
+        // Chiama il metodo clear di UserSession
         UserSession.clear()
+
+        // Aggiorna lo stato locale
         isLoggedIn.value = false
     }
 }

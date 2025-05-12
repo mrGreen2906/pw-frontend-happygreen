@@ -47,7 +47,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -55,7 +54,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -81,6 +79,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -103,12 +102,8 @@ import com.example.frontend_happygreen.data.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.frontend_happygreen.ui.components.CenteredLoader
 
 class MainScreenViewModel : ViewModel() {
@@ -138,29 +133,40 @@ class MainScreenViewModel : ViewModel() {
     val userPosts: StateFlow<List<Post>> = _userPosts.asStateFlow()
 
     // Per i punteggi
-    var leaderboardData = mutableStateOf<List<LeaderboardItem>>(emptyList())
+    var leaderboardData = mutableStateOf<List<LeaderboardItems>>(emptyList())
     var isLoadingLeaderboard = mutableStateOf(false)
     var selectedGameForLeaderboard = mutableStateOf<String?>(null)
+
+    // Flag per tenere traccia se la classifica è stata inizializzata
+    private var leaderboardInitialized = false
 
     init {
         loadUserData()
         loadInitialData()
+        // Carica immediatamente la classifica globale all'avvio
+        loadLeaderboard()
     }
 
-    data class LeaderboardItem(
+    data class LeaderboardItems(
         val id: Int,
         val username: String,
         val score: Int,
-        val avatar: String? = null
+        val avatar: String? = null,
+        val isCurrentUser: Boolean = false
     )
 
     fun loadLeaderboard(gameId: String? = null) {
         isLoadingLeaderboard.value = true
         selectedGameForLeaderboard.value = gameId
+        errorMessage.value = null // Reset eventuali messaggi di errore precedenti
 
         viewModelScope.launch {
             try {
-                val token = UserSession.getAuthHeader() ?: return@launch
+                val token = UserSession.getAuthHeader() ?: run {
+                    errorMessage.value = "Devi accedere per visualizzare la classifica"
+                    isLoadingLeaderboard.value = false
+                    return@launch
+                }
 
                 val response = if (gameId != null) {
                     apiService.getLeaderboard(token, gameId)
@@ -171,20 +177,27 @@ class MainScreenViewModel : ViewModel() {
                 if (response.isSuccessful && response.body() != null) {
                     val data = response.body()!!
 
+                    // Ottieni l'ID dell'utente corrente per evidenziarlo nella classifica
+                    val currentUserId = UserSession.getUserId() ?: -1
+
                     // Mappa la risposta alle LeaderboardItem
                     leaderboardData.value = data.map { item ->
-                        (if (gameId != null) item.score else item.ecoPoints)?.let {
-                            LeaderboardItem(
-                                id = item.userId,
-                                username = item.username,
-                                score = it,
-                                avatar = item.avatar
-                            )
-                        }!!
+                        LeaderboardItems(
+                            id = item.userId,
+                            username = item.username,
+                            score = (if (gameId != null) item.score else item.ecoPoints) ?: 0,
+                            avatar = item.avatar,
+                            isCurrentUser = item.userId == currentUserId
+                        )
                     }
+
+                    // Impostiamo che la classifica è stata inizializzata
+                    leaderboardInitialized = true
+                } else {
+                    errorMessage.value = "Errore nel caricamento della classifica: ${response.code()}"
                 }
             } catch (e: Exception) {
-                // Handle error
+                errorMessage.value = "Errore di connessione: ${e.message}"
             } finally {
                 isLoadingLeaderboard.value = false
             }
@@ -200,6 +213,7 @@ class MainScreenViewModel : ViewModel() {
         val leaderboardData by viewModel.leaderboardData
         val isLoading by viewModel.isLoadingLeaderboard
         val selectedGame by viewModel.selectedGameForLeaderboard
+        val error by viewModel.errorMessage
 
         var selectedTab by remember { mutableStateOf(0) }
         val games = listOf(
@@ -211,6 +225,13 @@ class MainScreenViewModel : ViewModel() {
         // Carica la classifica quando cambia la tab
         LaunchedEffect(selectedTab) {
             viewModel.loadLeaderboard(games[selectedTab].first)
+        }
+
+        // Se la classifica non è stata ancora inizializzata, la carichiamo
+        LaunchedEffect(Unit) {
+            if (!leaderboardInitialized) {
+                viewModel.loadLeaderboard(games[selectedTab].first)
+            }
         }
 
         Column(
@@ -249,34 +270,83 @@ class MainScreenViewModel : ViewModel() {
             }
 
             // Contenuto della classifica
-            if (isLoading) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = Green600)
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    item {
-                        Text(
-                            text = "Classifica ${games[selectedTab].second}",
-                            style = MaterialTheme.typography.titleLarge,
-                            modifier = Modifier.padding(16.dp)
-                        )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+            ) {
+                when {
+                    isLoading -> {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            CircularProgressIndicator(color = Green600)
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text("Caricamento classifica in corso...")
+                        }
                     }
-
-                    itemsIndexed(leaderboardData) { index, item ->
-                        LeaderboardItem(
-                            rank = index + 1,
-                            username = item.username,
-                            score = item.score,
-                            avatar = item.avatar,
-                            isCurrentUser = item.id == UserSession.getUserId()
-                        )
-                        Divider()
+                    error != null -> {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.EmojiEvents,
+                                contentDescription = null,
+                                tint = Color.Gray,
+                                modifier = Modifier.size(64.dp)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = error!!,
+                                color = Color.Gray,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(24.dp))
+                            Button(
+                                onClick = { loadLeaderboard(games[selectedTab].first) },
+                                colors = ButtonDefaults.buttonColors(containerColor = Green600)
+                            ) {
+                                Text("Riprova")
+                            }
+                        }
+                    }
+                    leaderboardData.isEmpty() -> {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.EmojiEvents,
+                                contentDescription = null,
+                                tint = Color.Gray,
+                                modifier = Modifier.size(64.dp)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Nessun dato disponibile per questa classifica",
+                                color = Color.Gray,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                    else -> {
+                        LazyColumn {
+                            itemsIndexed(leaderboardData) { index, item ->
+                                LeaderboardItem(
+                                    rank = index + 1,
+                                    username = item.username,
+                                    score = item.score,
+                                    avatar = item.avatar,
+                                    isCurrentUser = item.isCurrentUser
+                                )
+                                Divider()
+                            }
+                        }
                     }
                 }
             }
@@ -291,7 +361,7 @@ class MainScreenViewModel : ViewModel() {
         avatar: String? = null,
         isCurrentUser: Boolean = false
     ) {
-        val backgroundColor = if (isCurrentUser) Green100 else Color.White
+        val backgroundColor = if (isCurrentUser) Green100 else Color.Transparent
         val fontWeight = if (isCurrentUser) FontWeight.Bold else FontWeight.Normal
 
         Row(
@@ -566,7 +636,17 @@ class MainScreenViewModel : ViewModel() {
      * Effettua il logout
      */
     fun logout() {
+        // Cancella completamente la sessione utente
         UserSession.clear()
+
+        // Resetta tutti gli stati del ViewModel
+        userName.value = ""
+        userEmail.value = ""
+        userPoints.value = 0
+        userLevel.value = calculateLevel(0)
+        classes.value = emptyList()
+        userBadges.value = emptyList()
+        leaderboardData.value = emptyList()
     }
 }
 
@@ -780,8 +860,7 @@ fun GameCard(
 
             // Dettagli del gioco
             Column(
-                modifier = Modifier.weight(1f)
-            ) {
+                modifier = Modifier.weight(1f)) {
                 Text(
                     text = game.name,
                     style = MaterialTheme.typography.titleLarge,
@@ -948,7 +1027,7 @@ fun MainAppScaffold(
     onGameSelected: (String) -> Unit,
     onHideGamesBanner: () -> Unit,
 
-) {
+    ) {
     var showEcoAIChat by remember { mutableStateOf(false) }
     var showBarcodeScanner by remember { mutableStateOf(false) }
     var showGamesScreen by remember { mutableStateOf(false) }
@@ -1054,109 +1133,109 @@ fun MainAppScaffold(
     }
 }
 
-    // Top Bar
-    @Composable
-    public fun AppTopBar(
-        onProfileClick: () -> Unit,
-        onGamesClick: () -> Unit,
-        onLeaderboardClick: () -> Unit,  // Aggiunto questo parametro
-        hasNotifications: Boolean = false,
-        notificationCount: Int = 0
-    ): Unit {
-        Surface(
+// Top Bar
+@Composable
+public fun AppTopBar(
+    onProfileClick: () -> Unit,
+    onGamesClick: () -> Unit,
+    onLeaderboardClick: () -> Unit,  // Aggiunto questo parametro
+    hasNotifications: Boolean = false,
+    notificationCount: Int = 0
+): Unit {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(140.dp),
+        color = Green600
+    ) {
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(140.dp),
-            color = Green600
+                .fillMaxSize()
+                .padding(top = 42.dp, bottom = 12.dp, start = 16.dp, end = 16.dp),
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = 42.dp, bottom = 12.dp, start = 16.dp, end = 16.dp),
-                verticalArrangement = Arrangement.SpaceBetween
+            // Top row with logo and actions
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                // Top row with logo and actions
+                // App logo and name with larger size
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // App logo and name with larger size
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.happy_green_logo),
-                            contentDescription = "App Logo",
-                            modifier = Modifier.size(48.dp)
-                        )
+                    Image(
+                        painter = painterResource(id = R.drawable.happy_green_logo),
+                        contentDescription = "App Logo",
+                        modifier = Modifier.size(48.dp)
+                    )
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
 
-                        Text(
-                            text = "HappyGreen",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 24.sp
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    // Action buttons
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        // Leaderboard button
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.2f))
-                                .clickable(onClick = onLeaderboardClick)
-                                .padding(8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.EmojiEvents,
-                                contentDescription = "Classifica",
-                                tint = Color.White,
-                                modifier = Modifier.size(28.dp)
-                            )
-                        }
-
-                        // Games button
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.2f))
-                                .clickable(onClick = onGamesClick)
-                                .padding(8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.SportsEsports,
-                                contentDescription = "Giochi",
-                                tint = Color.White,
-                                modifier = Modifier.size(28.dp)
-                            )
-                        }
-
-                        // Notifications
-                        if (hasNotifications) {
-                            NotificationIcon(count = notificationCount)
-                        }
-
-                        // Profile
-                        UserAvatar(onClick = onProfileClick)
-                    }
+                    Text(
+                        text = "HappyGreen",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 24.sp
+                    )
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.weight(1f))
+
+                // Action buttons
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Leaderboard button
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.2f))
+                            .clickable(onClick = onLeaderboardClick)
+                            .padding(8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.EmojiEvents,
+                            contentDescription = "Classifica",
+                            tint = Color.White,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+
+                    // Games button
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.2f))
+                            .clickable(onClick = onGamesClick)
+                            .padding(8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SportsEsports,
+                            contentDescription = "Giochi",
+                            tint = Color.White,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+
+                    // Notifications
+                    if (hasNotifications) {
+                        NotificationIcon(count = notificationCount)
+                    }
+
+                    // Profile
+                    UserAvatar(onClick = onProfileClick)
+                }
             }
+
+            Spacer(modifier = Modifier.height(20.dp))
         }
     }
+}
 
 // Updated UserAvatar function with larger size
 @Composable
@@ -1219,79 +1298,79 @@ fun NotificationIcon(count: Int) {
 }
 
 
-    @Composable
-    fun WelcomeHeader() {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(color = Green100, shape = RoundedCornerShape(16.dp))
-                .padding(16.dp)
-        ) {
-            Text(
-                text = "Benvenuto in HappyGreen!",
-                style = MaterialTheme.typography.titleLarge,
-                color = Green800
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Unisciti a classi eco-friendly e guadagna Green Points!",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Green600
-            )
-        }
-    }
-
-
-    @Composable
-    fun ClassCard(
-        classRoom: ClassRoom,
-        onClick: () -> Unit
+@Composable
+fun WelcomeHeader() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(color = Green100, shape = RoundedCornerShape(16.dp))
+            .padding(16.dp)
     ) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(120.dp)
-                .clickable(onClick = onClick),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                Image(
-                    painter = painterResource(id = classRoom.backgroundImageId),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
+        Text(
+            text = "Benvenuto in HappyGreen!",
+            style = MaterialTheme.typography.titleLarge,
+            color = Green800
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "Unisciti a classi eco-friendly e guadagna Green Points!",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Green600
+        )
+    }
+}
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.4f))
-                )
 
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.Bottom
-                ) {
-                    Text(
-                        text = classRoom.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White,
-                        maxLines = 1
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Insegnante: ${classRoom.teacherName}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.8f),
-                        maxLines = 1
-                    )
-                }
+@Composable
+fun ClassCard(
+    classRoom: ClassRoom,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(120.dp)
+            .clickable(onClick = onClick),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Image(
+                painter = painterResource(id = classRoom.backgroundImageId),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.4f))
+            )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.Bottom
+            ) {
+                Text(
+                    text = classRoom.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White,
+                    maxLines = 1
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Insegnante: ${classRoom.teacherName}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.8f),
+                    maxLines = 1
+                )
             }
         }
     }
+}
 @Composable
 fun ActivityCard(
     title: String,
@@ -1339,333 +1418,333 @@ fun ActivityCard(
         }
     }
 }
-    // Home Content
-    @Composable
-    fun HomeContent(
-        classList: List<ClassRoom>,
-        onClassSelected: (ClassRoom) -> Unit
+// Home Content
+@Composable
+fun HomeContent(
+    classList: List<ClassRoom>,
+    onClassSelected: (ClassRoom) -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            item {
-                WelcomeHeader()
-                Spacer(modifier = Modifier.height(16.dp))
-            }
+        item {
+            WelcomeHeader()
+            Spacer(modifier = Modifier.height(16.dp))
+        }
 
-            item {
-                SectionHeader(
-                    title = "Le tue classi",
-                    action = {
-                        TextButton(onClick = { /* View all */ }) {
-                            Text("Vedi tutte")
-                        }
+        item {
+            SectionHeader(
+                title = "Le tue classi",
+                action = {
+                    TextButton(onClick = { /* View all */ }) {
+                        Text("Vedi tutte")
                     }
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-            }
+                }
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
 
-            items(
-                items = classList,
-                key = { it.name }
-            ) { classRoom ->
-                ClassCard(
-                    classRoom = classRoom,
-                    onClick = { onClassSelected(classRoom) }
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-            }
+        items(
+            items = classList,
+            key = { it.name }
+        ) { classRoom ->
+            ClassCard(
+                classRoom = classRoom,
+                onClick = { onClassSelected(classRoom) }
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
 
-            item {
-                SectionHeader(title = "Attività recenti")
-                Spacer(modifier = Modifier.height(8.dp))
+        item {
+            SectionHeader(title = "Attività recenti")
+            Spacer(modifier = Modifier.height(8.dp))
 
-                ActivityCard(
-                    title = "Albero piantato",
-                    description = "Hai guadagnato 50 punti per aver contribuito alla campagna di riforestazione",
-                    iconId = R.drawable.happy_green_logo
-                )
-                Spacer(modifier = Modifier.height(8.dp))
+            ActivityCard(
+                title = "Albero piantato",
+                description = "Hai guadagnato 50 punti per aver contribuito alla campagna di riforestazione",
+                iconId = R.drawable.happy_green_logo
+            )
+            Spacer(modifier = Modifier.height(8.dp))
 
-                ActivityCard(
-                    title = "Quiz completato",
-                    description = "Hai risposto correttamente a 8/10 domande sul cambiamento climatico",
-                    iconId = R.drawable.happy_green_logo
-                )
+            ActivityCard(
+                title = "Quiz completato",
+                description = "Hai risposto correttamente a 8/10 domande sul cambiamento climatico",
+                iconId = R.drawable.happy_green_logo
+            )
 
-                Spacer(modifier = Modifier.height(80.dp))
-            }
+            Spacer(modifier = Modifier.height(80.dp))
         }
     }
+}
 
 
 
 
-    @Composable
-    fun ExploreCard(title: String, description: String) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.Gray
-                )
-            }
+@Composable
+fun ExploreCard(title: String, description: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.Gray
+            )
         }
     }
-    // Explore Content
-    @Composable
-    fun ExploreContent() {
+}
+// Explore Content
+@Composable
+fun ExploreContent() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "Esplora",
+            style = MaterialTheme.typography.headlineMedium,
+            color = Green600
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        ExploreCard(
+            title = "Trova eventi eco-friendly",
+            description = "Scopri eventi di pulizia, piantumazione e sensibilizzazione ambientale nella tua zona."
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        ExploreCard(
+            title = "Trova altri eco-warriors",
+            description = "Connettiti con altri appassionati di sostenibilità per attività e collaborazioni."
+        )
+    }
+}
+
+
+@Composable
+fun StatisticsItem(
+    title: String,
+    value: String,
+    icon: ImageVector
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = Green600,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium,
+            color = Green800,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+
+@Composable
+fun StatisticsCard() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            StatisticsItem(
+                title = "Rifiuti riciclati",
+                value = "324 kg",
+                icon = Icons.Default.Delete
+            )
+            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            StatisticsItem(
+                title = "Alberi piantati",
+                value = "12",
+                icon = Icons.Default.Forest
+            )
+            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            StatisticsItem(
+                title = "Quiz completati",
+                value = "35",
+                icon = Icons.Default.Check
+            )
+        }
+    }
+}
+@Composable
+fun PointsCard(points: Int, level: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Green100)
+    ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
+            modifier = Modifier.padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "Esplora",
-                style = MaterialTheme.typography.headlineMedium,
+                text = "Green Points",
+                style = MaterialTheme.typography.titleMedium
+            )
+            Text(
+                text = points.toString(),
+                style = MaterialTheme.typography.displaySmall,
                 color = Green600
             )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            ExploreCard(
-                title = "Trova eventi eco-friendly",
-                description = "Scopri eventi di pulizia, piantumazione e sensibilizzazione ambientale nella tua zona."
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            ExploreCard(
-                title = "Trova altri eco-warriors",
-                description = "Connettiti con altri appassionati di sostenibilità per attività e collaborazioni."
-            )
-        }
-    }
-
-
-    @Composable
-    fun StatisticsItem(
-        title: String,
-        value: String,
-        icon: ImageVector
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = Green600,
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(modifier = Modifier.width(16.dp))
             Text(
-                text = title,
+                text = "Livello: $level",
                 style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f)
-            )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleMedium,
-                color = Green800,
-                fontWeight = FontWeight.Bold
+                color = Green800
             )
         }
     }
-
-
-    @Composable
-    fun StatisticsCard() {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
+}
+@Composable
+fun BadgeItem(name: String, iconId: Int) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.width(80.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(60.dp)
+                .clip(CircleShape)
+                .background(Green100)
+                .border(2.dp, Green300, CircleShape),
+            contentAlignment = Alignment.Center
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                StatisticsItem(
-                    title = "Rifiuti riciclati",
-                    value = "324 kg",
-                    icon = Icons.Default.Delete
-                )
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
-                StatisticsItem(
-                    title = "Alberi piantati",
-                    value = "12",
-                    icon = Icons.Default.Forest
-                )
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
-                StatisticsItem(
-                    title = "Quiz completati",
-                    value = "35",
-                    icon = Icons.Default.Check
-                )
-            }
+            Image(
+                painter = painterResource(id = iconId),
+                contentDescription = name,
+                modifier = Modifier.size(40.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = name,
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+fun BadgesRow() {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(8) { index ->
+            BadgeItem(
+                name = "Badge ${index + 1}",
+                iconId = R.drawable.happy_green_logo
+            )
         }
     }
-    @Composable
-    fun PointsCard(points: Int, level: String) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Green100)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "Green Points",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    text = points.toString(),
-                    style = MaterialTheme.typography.displaySmall,
-                    color = Green600
-                )
-                Text(
-                    text = "Livello: $level",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Green800
-                )
-            }
-        }
-    }
-    @Composable
-    fun BadgeItem(name: String, iconId: Int) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.width(80.dp)
-        ) {
+}
+// Profile Content
+// Updated ProfileContent to use real user data
+@Composable
+fun ProfileContent(
+    userName: String,
+    userEmail: String,
+    userPoints: Int,
+    userLevel: String,
+    userBadges: List<BadgeItem>
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        item {
+            // User avatar
             Box(
                 modifier = Modifier
-                    .size(60.dp)
+                    .size(120.dp)
                     .clip(CircleShape)
                     .background(Green100)
-                    .border(2.dp, Green300, CircleShape),
+                    .border(2.dp, Green600, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Image(
-                    painter = painterResource(id = iconId),
-                    contentDescription = name,
-                    modifier = Modifier.size(40.dp)
+                    painter = painterResource(id = R.drawable.happy_green_logo),
+                    contentDescription = "Avatar",
+                    modifier = Modifier.size(80.dp)
                 )
             }
-            Spacer(modifier = Modifier.height(4.dp))
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             Text(
-                text = name,
-                style = MaterialTheme.typography.bodySmall,
-                maxLines = 1
+                text = userName,
+                style = MaterialTheme.typography.titleLarge
             )
+
+            Text(
+                text = userEmail,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.Gray
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
         }
-    }
 
-    @Composable
-    fun BadgesRow() {
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(8) { index ->
-                BadgeItem(
-                    name = "Badge ${index + 1}",
-                    iconId = R.drawable.happy_green_logo
-                )
-            }
+        item {
+            // Points card
+            PointsCard(points = userPoints, level = userLevel)
+            Spacer(modifier = Modifier.height(24.dp))
         }
-    }
-    // Profile Content
-// Updated ProfileContent to use real user data
-    @Composable
-    fun ProfileContent(
-        userName: String,
-        userEmail: String,
-        userPoints: Int,
-        userLevel: String,
-        userBadges: List<BadgeItem>
-    ) {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            item {
-                // User avatar
-                Box(
-                    modifier = Modifier
-                        .size(120.dp)
-                        .clip(CircleShape)
-                        .background(Green100)
-                        .border(2.dp, Green600, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.happy_green_logo),
-                        contentDescription = "Avatar",
-                        modifier = Modifier.size(80.dp)
-                    )
-                }
 
-                Spacer(modifier = Modifier.height(16.dp))
+        item {
+            // Badges section
+            SectionHeader(title = "Le mie badge")
+            Spacer(modifier = Modifier.height(8.dp))
 
+            if (userBadges.isEmpty()) {
                 Text(
-                    text = userName,
-                    style = MaterialTheme.typography.titleLarge
-                )
-
-                Text(
-                    text = userEmail,
+                    text = "Non hai ancora guadagnato nessuna badge",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.Gray
+                    color = Color.Gray,
+                    modifier = Modifier.padding(vertical = 12.dp)
                 )
-
-                Spacer(modifier = Modifier.height(24.dp))
+            } else {
+                BadgesRow(badges = userBadges)
             }
 
-            item {
-                // Points card
-                PointsCard(points = userPoints, level = userLevel)
-                Spacer(modifier = Modifier.height(24.dp))
-            }
+            Spacer(modifier = Modifier.height(24.dp))
+        }
 
-            item {
-                // Badges section
-                SectionHeader(title = "Le mie badge")
-                Spacer(modifier = Modifier.height(8.dp))
-
-                if (userBadges.isEmpty()) {
-                    Text(
-                        text = "Non hai ancora guadagnato nessuna badge",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Gray,
-                        modifier = Modifier.padding(vertical = 12.dp)
-                    )
-                } else {
-                    BadgesRow(badges = userBadges)
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-            }
-
-            item {
-                // Statistics section
-                SectionHeader(title = "Le mie statistiche")
-                Spacer(modifier = Modifier.height(8.dp))
-                StatisticsCard()
-                Spacer(modifier = Modifier.height(80.dp))
-            }
+        item {
+            // Statistics section
+            SectionHeader(title = "Le mie statistiche")
+            Spacer(modifier = Modifier.height(8.dp))
+            StatisticsCard()
+            Spacer(modifier = Modifier.height(80.dp))
         }
     }
+}
 
 @Composable
 fun BadgesRow(badges: List<BadgeItem>) {
@@ -1834,9 +1913,7 @@ fun ProfileDialog(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Logout")
                 }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Logout")
-                }
             }
         }
     }
+}
