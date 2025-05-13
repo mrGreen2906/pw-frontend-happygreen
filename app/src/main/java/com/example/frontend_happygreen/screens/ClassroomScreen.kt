@@ -424,19 +424,19 @@ fun ClassroomPostCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                ActionButton(
+                ClassActionButton(
                     icon = Icons.Default.ThumbUp,
                     text = "Like",
                     onClick = { onReactionClick("👍") }
                 )
 
-                ActionButton(
+                ClassActionButton(
                     icon = Icons.Default.ChatBubbleOutline,
                     text = "Commenta",
                     onClick = { showCommentInput = !showCommentInput }
                 )
 
-                ActionButton(
+                ClassActionButton(
                     icon = Icons.Default.Share,
                     text = "Condividi",
                     onClick = { /* Implement sharing */ }
@@ -557,7 +557,7 @@ fun ReactionChip(
 }
 
 @Composable
-fun ActionButton(
+fun ClassActionButton(
     icon: ImageVector,
     text: String,
     onClick: () -> Unit
