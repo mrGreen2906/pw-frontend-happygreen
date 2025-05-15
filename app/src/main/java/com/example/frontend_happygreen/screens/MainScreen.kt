@@ -104,6 +104,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.GroupAdd
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material3.*
 import androidx.compose.ui.text.style.TextOverflow
 import com.example.frontend_happygreen.ui.components.CenteredLoader
@@ -525,7 +529,247 @@ class MainScreenViewModel : ViewModel() {
             }
         }
     }
+// Funzioni aggiuntive per MainScreenViewModel
 
+// Aggiungi questi metodi alla classe MainScreenViewModel
+// Usa questi all'interno della classe esistente
+
+    /**
+     * Carica gruppi dell'utente dal server
+     */
+    fun loadUserGroups() {
+        viewModelScope.launch {
+            isLoading.value = true
+            errorMessage.value = null
+
+            try {
+                val token = UserSession.getAuthHeader()
+                if (token != null) {
+                    // Utilizza l'endpoint my_groups per ottenere i gruppi dell'utente
+                    val response = apiService.getMyGroups(token)
+
+                    if (response.isSuccessful && response.body() != null) {
+                        val groups = response.body()!!
+
+                        // Converti in oggetti ClassRoom
+                        classes.value = groups.map { group ->
+                            ClassRoom(
+                                id = group.id ?: 0,
+                                name = group.name,
+                                description = group.description ?: "",
+                                backgroundImageId = R.drawable.happy_green_logo,
+                                teacherName = if (group.ownerId == UserSession.getUserId())
+                                    "Tu (Proprietario)"
+                                else
+                                    "Proprietario: ID ${group.ownerId}"
+                            )
+                        }
+                    } else {
+                        errorMessage.value = "Errore nel caricamento dei gruppi: ${response.code()}"
+                        // Usa dati locali in caso di errore
+                        loadLocalGroups()
+                    }
+                } else {
+                    // Nessun token, usa i dati memorizzati
+                    loadLocalGroups()
+                }
+            } catch (e: Exception) {
+                errorMessage.value = "Errore di connessione: ${e.message}"
+                // In caso di errore di rete, usa i dati memorizzati localmente
+                loadLocalGroups()
+            } finally {
+                isLoading.value = false
+            }
+        }
+    }
+
+    /**
+     * Carica gruppi locali (fallback in caso di errori di rete)
+     */
+    private fun loadLocalGroups() {
+        // Esempio di gruppi locali
+        classes.value = listOf(
+            ClassRoom(
+                id = 1,
+                name = "Eco Warriors",
+                description = "Gruppo per la sostenibilità ambientale",
+                backgroundImageId = R.drawable.happy_green_logo,
+                teacherName = "Local Data"
+            ),
+            ClassRoom(
+                id = 2,
+                name = "Green Team",
+                description = "Condividi le tue iniziative eco-friendly",
+                backgroundImageId = R.drawable.happy_green_logo,
+                teacherName = "Local Data"
+            )
+        )
+    }
+
+    /**
+     * Unisciti a un gruppo esistente
+     */
+    fun joinGroup(groupId: Int, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val token = UserSession.getAuthHeader() ?: return@launch
+                val userId = UserSession.getUserId() ?: return@launch
+
+                val request = AddMemberRequest(userId = userId)
+                val response = apiService.addGroupMember(groupId, request, token)
+
+                if (response.isSuccessful) {
+                    // Ricarica i gruppi dell'utente
+                    loadUserGroups()
+                    onSuccess()
+                } else {
+                    onError("Impossibile unirsi al gruppo: ${response.code()}")
+                }
+            } catch (e: Exception) {
+                onError("Errore di connessione: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Lascia un gruppo
+     */
+    fun leaveGroup(groupId: Int, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val token = UserSession.getAuthHeader() ?: return@launch
+                val userId = UserSession.getUserId() ?: return@launch
+
+                val request = RemoveMemberRequest(userId = userId)
+                val response = apiService.removeGroupMember(groupId, request, token)
+
+                if (response.isSuccessful) {
+                    // Rimuovi il gruppo dalla lista locale
+                    classes.value = classes.value.filter { it.id != groupId }
+                    onSuccess()
+                } else {
+                    onError("Impossibile abbandonare il gruppo: ${response.code()}")
+                }
+            } catch (e: Exception) {
+                onError("Errore di connessione: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Cerca gruppi disponibili
+     */
+    fun searchGroups(query: String, onSuccess: (List<ClassRoom>) -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val token = UserSession.getAuthHeader() ?: return@launch
+
+                // Usa l'endpoint per ottenere tutti i gruppi
+                val response = apiService.getGroups(token)
+
+                if (response.isSuccessful && response.body() != null) {
+                    val allGroups = response.body()!!
+
+                    // Filtra i gruppi in base alla query
+                    val filteredGroups = allGroups.filter {
+                        it.name.contains(query, ignoreCase = true) ||
+                                (it.description?.contains(query, ignoreCase = true) ?: false)
+                    }
+
+                    // Converti in oggetti ClassRoom
+                    val groupsAsClassRooms = filteredGroups.map { group ->
+                        ClassRoom(
+                            id = group.id ?: 0,
+                            name = group.name,
+                            description = group.description ?: "",
+                            backgroundImageId = R.drawable.happy_green_logo,
+                            teacherName = "ID Proprietario: ${group.ownerId}"
+                        )
+                    }
+
+                    onSuccess(groupsAsClassRooms)
+                } else {
+                    onError("Errore nella ricerca dei gruppi: ${response.code()}")
+                }
+            } catch (e: Exception) {
+                onError("Errore di connessione: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Crea un nuovo gruppo con integrazione API
+     */
+    fun createGroup(newGroup: ClassRoom, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                isLoading.value = true  // Mostra indicatore di caricamento
+
+                val token = UserSession.getAuthHeader() ?: run {
+                    onError("Devi effettuare l'accesso per creare un gruppo")
+                    isLoading.value = false
+                    return@launch
+                }
+
+                val userId = UserSession.getUserId() ?: run {
+                    onError("ID utente non disponibile")
+                    isLoading.value = false
+                    return@launch
+                }
+
+                // Crea un oggetto gruppo con i dati necessari
+                val group = Group(
+                    name = newGroup.name,
+                    description = newGroup.description,
+                    ownerId = userId
+                )
+
+                // Chiamata API per creare il gruppo
+                val response = apiService.createGroup(group, token)
+
+                if (response.isSuccessful && response.body() != null) {
+                    // Ottieni l'ID del gruppo creato
+                    val createdGroup = response.body()!!
+                    val createdId = createdGroup.id ?: 0
+
+                    // Crea un nuovo oggetto ClassRoom con l'ID corretto
+                    val updatedClassRoom = newGroup.copy(
+                        id = createdId,
+                        teacherName = "Tu (Proprietario)"
+                    )
+
+                    // Aggiungi il nuovo gruppo alla lista locale
+                    classes.value = classes.value + updatedClassRoom
+
+                    // Ricarica tutti i gruppi per essere sicuri
+                    loadUserGroups()
+
+                    // Notifica successo
+                    onSuccess()
+                } else {
+                    // Gestisci errore dalla risposta API
+                    val errorMsg = when (response.code()) {
+                        400 -> "Dati non validi. Verifica il nome del gruppo."
+                        401 -> "Sessione scaduta. Effettua nuovamente il login."
+                        403 -> "Non hai i permessi per creare gruppi."
+                        else -> "Errore nella creazione del gruppo: ${response.code()}"
+                    }
+                    onError(errorMsg)
+                }
+            } catch (e: Exception) {
+                // Gestisci errori di rete
+                onError("Errore di connessione: ${e.message ?: "Sconosciuto"}")
+
+                // Tenta di creare localmente il gruppo come fallback
+                val updatedClassRoom = newGroup.copy(
+                    teacherName = "Tu (Proprietario) - Non sincronizzato"
+                )
+                classes.value = classes.value + updatedClassRoom
+            } finally {
+                isLoading.value = false  // Nascondi indicatore di caricamento
+            }
+        }
+    }
     /**
      * Carica i gruppi dal server
      */
@@ -698,13 +942,15 @@ data class Game(
     val description: String,
     val iconId: Int
 )
+// Funzione CreateClassDialog aggiornata per una migliore esperienza utente
+
 @Composable
 fun CreateClassDialog(
     onDismiss: () -> Unit,
     onClassCreated: (ClassRoom) -> Unit
 ) {
     var className by remember { mutableStateOf("") }
-    var teacherName by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }  // Aggiunto campo descrizione
     var isCreating by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -721,7 +967,7 @@ fun CreateClassDialog(
             ) {
                 // Header
                 Text(
-                    text = "Crea Nuova Classe",
+                    text = "Crea Nuovo Gruppo",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = Green800
@@ -729,24 +975,24 @@ fun CreateClassDialog(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Class name field
+                // Group name field
                 OutlinedTextField(
                     value = className,
                     onValueChange = { className = it },
-                    label = { Text("Nome Classe") },
+                    label = { Text("Nome Gruppo") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Teacher name field
+                // Description field
                 OutlinedTextField(
-                    value = teacherName,
-                    onValueChange = { teacherName = it },
-                    label = { Text("Nome Insegnante") },
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Descrizione (opzionale)") },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    maxLines = 3
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -768,8 +1014,9 @@ fun CreateClassDialog(
                                 isCreating = true
                                 val newClass = ClassRoom(
                                     name = className,
+                                    description = description.trim(),
                                     backgroundImageId = R.drawable.happy_green_logo,
-                                    teacherName = if (teacherName.isBlank()) "Unknown Teacher" else teacherName
+                                    teacherName = "Tu (Proprietario)"
                                 )
                                 onClassCreated(newClass)
                             }
@@ -804,7 +1051,7 @@ fun MainScreen(
     LaunchedEffect(Unit) {
         viewModel.refreshData()
     }
-
+    var showGroupSearchScreen by remember { mutableStateOf(false) }
     // States from ViewModel
     val currentTab by viewModel.currentTab
     val isLoading by viewModel.isLoading
@@ -931,9 +1178,18 @@ fun MainScreen(
     if (showCreateClassDialog) {
         CreateClassDialog(
             onDismiss = { showCreateClassDialog = false },
-            onClassCreated = { newClass ->
+            onClassCreated = { classRoom ->
                 coroutineScope.launch {
-                    viewModel.createClass(newClass)
+                    viewModel.createGroup(
+                        newGroup = classRoom,  // Qui era 'newClass', corretto in 'newGroup'
+                        onSuccess = {
+                            // Mostra notifica di successo se vuoi
+                        },
+                        onError = { errorMsg ->
+                            // Gestisci l'errore se vuoi
+                            viewModel.errorMessage.value = errorMsg
+                        }
+                    )
                     showCreateClassDialog = false
                 }
             }
@@ -950,6 +1206,343 @@ data class BadgeItem(
 )
 
 // MainAppScaffold
+@Composable
+fun GroupsTab(
+    classList: List<ClassRoom>,
+    onClassSelected: (ClassRoom) -> Unit,
+    onCreateClassClick: () -> Unit,
+    onJoinClassClick: () -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            WelcomeHeader()
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "I tuoi gruppi",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = Green800,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Row {
+                    // Pulsante per unirsi a una classe esistente
+                    TextButton(
+                        onClick = onJoinClassClick,
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = Green600
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.GroupAdd,
+                            contentDescription = "Unisciti a un gruppo",
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Unisciti")
+                    }
+
+                    // Pulsante per creare una nuova classe
+                    TextButton(
+                        onClick = onCreateClassClick,
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = Green600
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Crea gruppo",
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Crea")
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        // Se non ci sono classi, mostra un messaggio
+        if (classList.isEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 32.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Green100
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Group,
+                            contentDescription = null,
+                            tint = Green600,
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Non sei ancora iscritto a nessun gruppo",
+                            style = MaterialTheme.typography.titleMedium,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Crea un nuovo gruppo o unisciti a uno esistente per condividere foto e luoghi eco-friendly con i tuoi amici",
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center,
+                            color = Color.Gray
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = onCreateClassClick,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Green600
+                            )
+                        ) {
+                            Text("Crea gruppo")
+                        }
+                    }
+                }
+            }
+        } else {
+            // Mostra l'elenco delle classi
+            items(
+                items = classList,
+                key = { it.id }
+            ) { classRoom ->
+                EnhancedClassCard(
+                    classRoom = classRoom,
+                    onClick = { onClassSelected(classRoom) }
+                )
+            }
+        }
+    }
+}
+@Composable
+fun EnhancedClassCard(
+    classRoom: ClassRoom,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(160.dp)  // Altezza aumentata
+            .clickable(onClick = onClick),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Image(
+                painter = painterResource(id = classRoom.backgroundImageId),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.4f))
+            )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Badge per tipo di gruppo (opzionale)
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = Green600
+                    ),
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Text(
+                        text = "Gruppo Attivo",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+
+                Column {
+                    Text(
+                        text = classRoom.name,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = "Insegnante: ${classRoom.teacherName}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.9f)
+                    )
+
+                    // Dettagli aggiuntivi
+                    if (classRoom.description.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = classRoom.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.7f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Icone informative
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.People,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "15 membri", // Questo dato dovrebbe venire dal backend
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White
+                            )
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Image,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "8 post", // Questo dato dovrebbe venire dal backend
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+@Composable
+fun JoinGroupDialog(
+    onDismiss: () -> Unit,
+    onJoin: (String) -> Unit
+) {
+    var groupCode by remember { mutableStateOf("") }
+    var isJoining by remember { mutableStateOf(false) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Header
+                Text(
+                    text = "Unisciti a un Gruppo",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Green800
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "Inserisci il codice di invito fornito dall'amministratore del gruppo",
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    color = Color.Gray
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Campo codice gruppo
+                OutlinedTextField(
+                    value = groupCode,
+                    onValueChange = { groupCode = it },
+                    label = { Text("Codice di invito") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Actions
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    TextButton(
+                        onClick = onDismiss
+                    ) {
+                        Text("Annulla")
+                    }
+
+                    Button(
+                        onClick = {
+                            if (groupCode.isNotBlank()) {
+                                isJoining = true
+                                onJoin(groupCode)
+                            }
+                        },
+                        enabled = groupCode.isNotBlank() && !isJoining,
+                        colors = ButtonDefaults.buttonColors(containerColor = Green600)
+                    ) {
+                        if (isJoining) {
+                            CircularProgressIndicator(
+                                color = Color.White,
+                                modifier = Modifier.size(24.dp),
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Text("Unisciti")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 fun GameCard(
@@ -1132,6 +1725,8 @@ fun GamesScreen(
 
 
 
+// Modifica alla chiamata di HomeContent in MainAppScaffold
+
 @Composable
 fun MainAppScaffold(
     currentTab: Int,
@@ -1225,19 +1820,6 @@ fun MainAppScaffold(
                                 tint = Color.White
                             )
                         }
-
-                        if (currentTab == 0) {
-                            FloatingActionButton(
-                                onClick = onCreateClassClick,
-                                containerColor = Green600
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Add,
-                                    contentDescription = "Crea Classe",
-                                    tint = Color.White
-                                )
-                            }
-                        }
                     }
                 }
             ) { innerPadding ->
@@ -1257,7 +1839,8 @@ fun MainAppScaffold(
                                     onClassSelected = { classRoom ->
                                         // Update the selected classroom to trigger navigation
                                         selectedClassroom = classRoom
-                                    }
+                                    },
+                                    onCreateGroupClick = onCreateClassClick  // Passa la funzione di callback
                                 )
                                 3 -> ProfileContent(
                                     userName = userName,
@@ -1271,7 +1854,8 @@ fun MainAppScaffold(
                                     onClassSelected = { classRoom ->
                                         // Update the selected classroom to trigger navigation
                                         selectedClassroom = classRoom
-                                    }
+                                    },
+                                    onCreateGroupClick = onCreateClassClick  // Passa la funzione di callback
                                 )
                             }
                         }
@@ -1513,7 +2097,8 @@ fun ClassCard(
 @Composable
 fun HomeContent(
     classList: List<ClassRoom>,
-    onClassSelected: (ClassRoom) -> Unit
+    onClassSelected: (ClassRoom) -> Unit,
+    onCreateGroupClick: () -> Unit = {}  // Aggiungi questo parametro
 ) {
     LazyColumn(
         modifier = Modifier
@@ -1527,14 +2112,34 @@ fun HomeContent(
         }
 
         item {
-            SectionHeader(
-                title = "Le tue classi",
-                action = {
-                    TextButton(onClick = { /* View all */ }) {
-                        Text("Vedi tutte")
-                    }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Le tue classi",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = Green800,
+                    fontWeight = FontWeight.Bold
+                )
+
+                // Pulsante per creare un nuovo gruppo
+                Button(
+                    onClick = onCreateGroupClick,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Green600
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Crea gruppo"
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Crea Gruppo")
                 }
-            )
+            }
+
             Spacer(modifier = Modifier.height(8.dp))
         }
 

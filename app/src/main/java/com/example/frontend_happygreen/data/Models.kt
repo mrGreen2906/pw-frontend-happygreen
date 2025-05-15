@@ -2,6 +2,60 @@ package com.example.frontend_happygreen.data
 
 import com.google.gson.annotations.SerializedName
 
+
+
+// Aggiungi a Models.kt
+data class GroupDetailResponse(
+    val id: Int,
+    val name: String,
+    val description: String? = null,
+    @SerializedName("created_at") val createdAt: String? = null,
+    val owner: Int,
+    @SerializedName("owner_details") val ownerDetails: UserData,
+    val members: List<MemberData>
+)
+
+data class MemberData(
+    val id: Int,
+    val user: UserData,
+    val role: String,
+    @SerializedName("joined_at") val joinedAt: String
+)
+
+data class AddMemberRequest(
+    @SerializedName("user_id") val userId: Int,
+    val role: String = "student" // Valore predefinito: student
+)
+
+// Richiesta per rimuovere un membro da un gruppo
+data class RemoveMemberRequest(
+    @SerializedName("user_id") val userId: Int
+)
+
+// Richiesta per cambiare il ruolo di un membro
+data class ChangeRoleRequest(
+    @SerializedName("user_id") val userId: Int,
+    val role: String
+)
+
+// Risposta alla richiesta di aggiungere un membro
+data class MembershipResponse(
+    val id: Int,
+    @SerializedName("user") val userDetails: UserData,
+    val role: String,
+    @SerializedName("joined_at") val joinedAt: String
+)
+
+// Dettaglio del gruppo con membri
+data class GroupDetail(
+    val id: Int,
+    val name: String,
+    val description: String?,
+    @SerializedName("created_at") val createdAt: String,
+    @SerializedName("owner") val ownerId: Int,
+    @SerializedName("owner_details") val ownerDetails: UserData,
+    val members: List<MembershipResponse>
+)
 /**
  * Modelli per autenticazione
  */

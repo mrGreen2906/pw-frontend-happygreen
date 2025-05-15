@@ -44,8 +44,6 @@ interface ApiService {
     @GET("posts/")
     suspend fun getPosts(@Header("Authorization") token: String): Response<List<Post>>
 
-    @POST("posts/")
-    suspend fun createPost(@Body post: Post, @Header("Authorization") token: String): Response<Post>
 
     // Badges
     @GET("badges/")
@@ -76,6 +74,57 @@ interface ApiService {
         @Header("Authorization") token: String,
         @Body request: UpdatePointsRequest
     ): Response<UpdatePointsResponse>
+
+    // Aggiungi questi metodi a ApiService.kt
+    @GET("groups/{id}/")
+    suspend fun getGroupById(
+        @Path("id") id: Int,
+        @Header("Authorization") token: String
+    ): Response<GroupDetailResponse>
+
+    @POST("groups/{id}/add_member/")
+    suspend fun addGroupMember(
+        @Path("id") groupId: Int,
+        @Body request: AddMemberRequest,
+        @Header("Authorization") token: String
+    ): Response<GroupMembership>
+
+    @DELETE("groups/{id}/remove_member/")
+    suspend fun removeGroupMember(
+        @Path("id") groupId: Int,
+        @Body request: RemoveMemberRequest,
+        @Header("Authorization") token: String
+    ): Response<Unit>
+
+    @POST("groups/{id}/change_role/")
+    suspend fun changeGroupMemberRole(
+        @Path("id") groupId: Int,
+        @Body request: ChangeRoleRequest,
+        @Header("Authorization") token: String
+    ): Response<GroupMembership>
+
+    @GET("groups/my_groups/")
+    suspend fun getMyGroups(
+        @Header("Authorization") token: String
+    ): Response<List<Group>>
+
+    @GET("posts/")
+    suspend fun getGroupPosts(
+        @Query("group") groupId: Int,
+        @Header("Authorization") token: String
+    ): Response<List<Post>>
+
+    @POST("posts/")
+    suspend fun createPost(
+        @Body post: Post,
+        @Header("Authorization") token: String
+    ): Response<Post>
+
+    @POST("comments/")
+    suspend fun createComment(
+        @Body comment: Comment,
+        @Header("Authorization") token: String
+    ): Response<Comment>
 }
 
 // Classi per le richieste e risposte

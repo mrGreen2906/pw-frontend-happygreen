@@ -13,12 +13,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.frontend_happygreen.audio.AudioController
 import com.example.frontend_happygreen.data.UserSession
 import com.example.frontend_happygreen.screens.AuthScreen
 import com.example.frontend_happygreen.screens.AuthViewModel
 import com.example.frontend_happygreen.screens.LoadingScreen
 import com.example.frontend_happygreen.screens.MainScreen
+import com.example.frontend_happygreen.screens.MainScreenViewModel
 import com.example.frontend_happygreen.screens.VerifyOTPScreen
 import com.example.frontend_happygreen.screens.WelcomeScreen
 import com.example.frontend_happygreen.ui.theme.FrontendhappygreenTheme
@@ -81,6 +83,7 @@ fun HappyGreenApp(
     onVolumeChange: (Float) -> Unit = {},
     volumeLevel: Float = 0.5f
 ) {
+    val mainScreenViewModel: MainScreenViewModel = viewModel()
     // Stato attuale dell'autenticazione
     val isLoggedIn by UserSession.isLoggedInFlow.collectAsState(initial = false)
 
@@ -145,6 +148,7 @@ fun HappyGreenApp(
             LaunchedEffect(isLoggedIn) {
                 if (isLoggedIn) {
                     currentScreen = Screen.Loading
+                    mainScreenViewModel.refreshData()
                 }
             }
         }
