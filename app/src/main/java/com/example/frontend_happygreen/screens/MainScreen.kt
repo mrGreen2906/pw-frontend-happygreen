@@ -111,6 +111,7 @@ import androidx.compose.material.icons.filled.People
 import androidx.compose.material3.*
 import androidx.compose.ui.text.style.TextOverflow
 import com.example.frontend_happygreen.ui.components.CenteredLoader
+import com.example.frontend_happygreen.ui.theme.Blue500
 
 class MainScreenViewModel : ViewModel() {
     private val apiService = RetrofitClient.create(ApiService::class.java)
@@ -1047,11 +1048,19 @@ fun MainScreen(
     onLogout: () -> Unit = {},
     viewModel: MainScreenViewModel = viewModel()
 ) {
-
     LaunchedEffect(Unit) {
         viewModel.refreshData()
     }
+
+    // UI States
     var showGroupSearchScreen by remember { mutableStateOf(false) }
+    var showEcoDetectiveGame by remember { mutableStateOf(false) }
+    var showEcoSfidaGame by remember { mutableStateOf(false) }
+    var showLeaderboardScreen by remember { mutableStateOf(false) }
+    var showBarcodeScanner by remember { mutableStateOf(false) }
+    var showClassroomScreen by remember { mutableStateOf<ClassRoom?>(null) }
+    var showCreateClassDialog by remember { mutableStateOf(false) }
+
     // States from ViewModel
     val currentTab by viewModel.currentTab
     val isLoading by viewModel.isLoading
@@ -1070,13 +1079,6 @@ fun MainScreen(
 
     // Local dialog states
     var showProfileDialog by remember { mutableStateOf(false) }
-    var showCreateClassDialog by remember { mutableStateOf(false) }
-    var showEcoDetectiveGame by remember { mutableStateOf(false) }
-    var showEcoSfidaGame by remember { mutableStateOf(false) }
-    var showLeaderboardScreen by remember { mutableStateOf(false) }  // Aggiunta questa variabile
-
-    // Stato per Classroom Screen
-    var showClassroomScreen by remember { mutableStateOf<ClassRoom?>(null) }
 
     val tabItems = listOf("Home", "Esplora", "Scanner", "Profilo")
     val icons = listOf(
@@ -1101,8 +1103,14 @@ fun MainScreen(
         )
     }
 
-    // Game screens, Classroom Screen e Leaderboard Screen
+    // Different screens based on user navigation
     when {
+        showGroupSearchScreen -> {
+            GroupSearchScreen(
+                onBack = { showGroupSearchScreen = false },
+                viewModel = viewModel
+            )
+        }
         showLeaderboardScreen -> viewModel.LeaderboardScreen(
             onBack = { showLeaderboardScreen = false }
         )
@@ -1112,6 +1120,7 @@ fun MainScreen(
         )
         showEcoDetectiveGame -> EcoDetectiveGameScreen(onBack = { showEcoDetectiveGame = false })
         showEcoSfidaGame -> EcoGameScreen()
+        showBarcodeScanner -> BarcodeScannerScreen(onBack = { showBarcodeScanner = false })
         else -> MainAppScaffold(
             currentTab = currentTab,
             tabItems = tabItems,
@@ -1136,6 +1145,7 @@ fun MainScreen(
             onTabSelected = viewModel::setCurrentTab,
             onProfileClick = { showProfileDialog = true },
             onCreateClassClick = { showCreateClassDialog = true },
+            onJoinClassClick = { showGroupSearchScreen = true },
             onClassSelected = { classroom ->
                 showClassroomScreen = classroom
             },
@@ -1145,6 +1155,7 @@ fun MainScreen(
                     "eco_sfida" -> showEcoSfidaGame = true
                 }
             },
+            onBarcodeScanClick = { showBarcodeScanner = true },
             onLeaderboardClick = { showLeaderboardScreen = true }
         )
     }
@@ -1168,25 +1179,17 @@ fun MainScreen(
     }
 
     // Dialog per creare una nuova classe
-    @Composable
-    fun CreateClassDialog(
-        onDismiss: () -> Unit,
-        onClassCreated: (ClassRoom) -> Unit
-    ) {
-    }
-
     if (showCreateClassDialog) {
         CreateClassDialog(
             onDismiss = { showCreateClassDialog = false },
             onClassCreated = { classRoom ->
                 coroutineScope.launch {
                     viewModel.createGroup(
-                        newGroup = classRoom,  // Qui era 'newClass', corretto in 'newGroup'
+                        newGroup = classRoom,
                         onSuccess = {
-                            // Mostra notifica di successo se vuoi
+                            // Success notification if needed
                         },
                         onError = { errorMsg ->
-                            // Gestisci l'errore se vuoi
                             viewModel.errorMessage.value = errorMsg
                         }
                     )
@@ -1197,6 +1200,300 @@ fun MainScreen(
     }
 }
 
+@Composable
+fun HomeContent(
+    classList: List<ClassRoom>,
+    onClassSelected: (ClassRoom) -> Unit,
+    onCreateGroupClick: () -> Unit = {},
+    onJoinGroupClick: () -> Unit = {}  // New parameter for joining groups
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            WelcomeHeader()
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "I tuoi gruppi",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = Green800,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Button to join existing group
+                    Button(
+                        onClick = onJoinGroupClick,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Blue500
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.GroupAdd,
+                            contentDescription = "Unisciti a gruppo"
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Cerca Gruppo")
+                    }
+
+                    // Button to create a new group
+                    Button(
+                        onClick = onCreateGroupClick,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Green600
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Crea gruppo"
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Crea Gruppo")
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        if (classList.isEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 32.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Green100
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Group,
+                            contentDescription = null,
+                            tint = Green600,
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Non sei ancora iscritto a nessun gruppo",
+                            style = MaterialTheme.typography.titleMedium,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Crea un nuovo gruppo o unisciti a uno esistente per condividere foto e luoghi eco-friendly con i tuoi amici",
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center,
+                            color = Color.Gray
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Button(
+                                onClick = onJoinGroupClick,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Blue500
+                                ),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = null
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Trova gruppi")
+                            }
+
+                            Button(
+                                onClick = onCreateGroupClick,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Green600
+                                ),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = null
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Crea gruppo")
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            items(
+                items = classList,
+                key = { it.id }
+            ) { classRoom ->
+                ClassCard(
+                    classRoom = classRoom,
+                    onClick = { onClassSelected(classRoom) }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MainAppScaffold(
+    currentTab: Int,
+    tabItems: List<String>,
+    icons: List<ImageVector>,
+    hasNotifications: Boolean,
+    notificationCount: Int,
+    isLoading: Boolean,
+    classList: List<ClassRoom>,
+    gamesList: List<Game>,
+    userName: String,
+    userEmail: String,
+    userPoints: Int,
+    userLevel: String,
+    userBadges: List<BadgeItem>,
+    onTabSelected: (Int) -> Unit,
+    onProfileClick: () -> Unit,
+    onCreateClassClick: () -> Unit,
+    onJoinClassClick: () -> Unit,  // Added parameter for joining groups
+    onClassSelected: (ClassRoom) -> Unit,
+    onGameSelected: (String) -> Unit,
+    onBarcodeScanClick: () -> Unit = {},
+    onLeaderboardClick: () -> Unit
+) {
+    var showEcoAIChat by remember { mutableStateOf(false) }
+    var showGamesScreen by remember { mutableStateOf(false) }
+    var selectedClassroom by remember { mutableStateOf<ClassRoom?>(null) }
+
+    // Handle different screens based on navigation state
+    when {
+        showEcoAIChat -> {
+            EcoAIChatScreen(onBack = { showEcoAIChat = false })
+        }
+        showGamesScreen -> {
+            GamesScreen(
+                games = gamesList,
+                onGameSelected = { gameId ->
+                    showGamesScreen = false
+                    onGameSelected(gameId)
+                },
+                onBack = { showGamesScreen = false }
+            )
+        }
+        selectedClassroom != null -> {
+            ClassroomScreen(
+                classRoom = selectedClassroom!!,
+                onBack = { selectedClassroom = null }
+            )
+        }
+        else -> {
+            // Main app scaffold
+            Scaffold(
+                topBar = {
+                    AppTopBar(
+                        onProfileClick = onProfileClick,
+                        onGamesClick = { showGamesScreen = true },
+                        onLeaderboardClick = onLeaderboardClick,
+                    )
+                },
+                bottomBar = {
+                    NavigationBar {
+                        tabItems.forEachIndexed { index, item ->
+                            NavigationBarItem(
+                                icon = { Icon(icons[index], contentDescription = item) },
+                                label = { Text(item) },
+                                selected = currentTab == index,
+                                onClick = {
+                                    // Special handling for scanner tab
+                                    if (index == 2) { // Scanner tab
+                                        onBarcodeScanClick()
+                                    } else {
+                                        onTabSelected(index)
+                                    }
+                                }
+                            )
+                        }
+                    }
+                },
+                floatingActionButton = {
+                    Column(horizontalAlignment = Alignment.End) {
+                        FloatingActionButton(
+                            onClick = { showEcoAIChat = true },
+                            containerColor = Color(0xFF009688),
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ChatBubble,
+                                contentDescription = "Chiedi a EcoAI",
+                                tint = Color.White
+                            )
+                        }
+                    }
+                }
+            ) { innerPadding ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                        .background(Color.White)
+                ) {
+                    // Main content
+                    when {
+                        isLoading -> CenteredLoader(message = "Caricamento in corso...")
+                        else -> {
+                            when (currentTab) {
+                                0 -> HomeContent(
+                                    classList = classList,
+                                    onClassSelected = { classRoom ->
+                                        // Update the selected classroom to trigger navigation
+                                        selectedClassroom = classRoom
+                                    },
+                                    onCreateGroupClick = onCreateClassClick,
+                                    onJoinGroupClick = onJoinClassClick  // Pass the join function
+                                )
+                                3 -> ProfileContent(
+                                    userName = userName,
+                                    userEmail = userEmail,
+                                    userPoints = userPoints,
+                                    userLevel = userLevel,
+                                    userBadges = userBadges
+                                )
+                                else -> HomeContent(
+                                    classList = classList,
+                                    onClassSelected = { classRoom ->
+                                        // Update the selected classroom to trigger navigation
+                                        selectedClassroom = classRoom
+                                    },
+                                    onCreateGroupClick = onCreateClassClick,
+                                    onJoinGroupClick = onJoinClassClick  // Pass the join function
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 // Data model for badges in UI
 data class BadgeItem(
     val id: Int,
