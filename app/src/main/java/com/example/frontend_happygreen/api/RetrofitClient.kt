@@ -11,7 +11,7 @@ object RetrofitClient {
     private const val BASE_URL = "https://worm-shining-accurately.ngrok-free.app/"
     private val okHttpClient by lazy {
         val loggingInterceptor = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            level = HttpLoggingInterceptor.Level.BODY  // Set to BODY to see full request/response
         }
 
         OkHttpClient.Builder()

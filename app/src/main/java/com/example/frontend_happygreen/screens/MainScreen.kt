@@ -719,10 +719,11 @@ class MainScreenViewModel : ViewModel() {
                 }
 
                 // Crea un oggetto gruppo con i dati necessari
+// Crea un oggetto gruppo con i dati necessari
                 val group = Group(
                     name = newGroup.name,
                     description = newGroup.description,
-                    ownerId = userId
+                    ownerId = userId  // Make sure this matches the expected field name in your API
                 )
 
                 // Chiamata API per creare il gruppo
