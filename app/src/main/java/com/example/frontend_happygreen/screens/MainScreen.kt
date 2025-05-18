@@ -2,6 +2,7 @@
 
 package com.example.frontend_happygreen.screens
 
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -538,6 +539,8 @@ class MainScreenViewModel : ViewModel() {
     /**
      * Carica gruppi dell'utente dal server
      */
+    // Parte da modificare nella classe MainScreenViewModel
+
     fun loadUserGroups() {
         viewModelScope.launch {
             isLoading.value = true
@@ -546,37 +549,50 @@ class MainScreenViewModel : ViewModel() {
             try {
                 val token = UserSession.getAuthHeader()
                 if (token != null) {
-                    // Utilizza l'endpoint my_groups per ottenere i gruppi dell'utente
                     val response = apiService.getMyGroups(token)
 
                     if (response.isSuccessful && response.body() != null) {
                         val groups = response.body()!!
 
-                        // Converti in oggetti ClassRoom
-                        classes.value = groups.map { group ->
-                            ClassRoom(
-                                id = group.id ?: 0,
+                        // Crea una lista temporanea di oggetti dal package data
+                        val dataClassRooms = groups.map { group ->
+                            val isOwner = group.ownerId == UserSession.getUserId()
+                            com.example.frontend_happygreen.data.ClassRoom(
+                                id = group.id ?: -1,
                                 name = group.name,
                                 description = group.description ?: "",
                                 backgroundImageId = R.drawable.happy_green_logo,
-                                teacherName = if (group.ownerId == UserSession.getUserId())
-                                    "Tu (Proprietario)"
-                                else
-                                    "Proprietario: ID ${group.ownerId}"
+                                teacherName = if (isOwner) "Tu (Proprietario)" else "Proprietario: ID ${group.ownerId}",
+                                memberCount = 0,
+                                ownerID = group.ownerId,
+                                userRole = if (isOwner) "admin" else null
+                            )
+                        }.filter { it.id > 0 }
+
+                        // Converti dal tipo data.ClassRoom al tipo screens.ClassRoom
+                        classes.value = dataClassRooms.map { dataRoom ->
+                            com.example.frontend_happygreen.screens.ClassRoom(
+                                id = dataRoom.id,
+                                name = dataRoom.name,
+                                description = dataRoom.description,
+                                backgroundImageId = dataRoom.backgroundImageId,
+                                teacherName = dataRoom.teacherName
+                                // Aggiungi eventuali altri campi necessari per screens.ClassRoom
                             )
                         }
                     } else {
+                        // Resto del codice invariato
+                        val errorBody = response.errorBody()?.string() ?: "Errore sconosciuto"
+                        Log.e("MainScreenViewModel", "Errore caricamento gruppi: ${response.code()} - $errorBody")
                         errorMessage.value = "Errore nel caricamento dei gruppi: ${response.code()}"
-                        // Usa dati locali in caso di errore
                         loadLocalGroups()
                     }
                 } else {
-                    // Nessun token, usa i dati memorizzati
                     loadLocalGroups()
                 }
             } catch (e: Exception) {
+                Log.e("MainScreenViewModel", "Eccezione: ${e.message}", e)
                 errorMessage.value = "Errore di connessione: ${e.message}"
-                // In caso di errore di rete, usa i dati memorizzati localmente
                 loadLocalGroups()
             } finally {
                 isLoading.value = false
@@ -832,11 +848,6 @@ class MainScreenViewModel : ViewModel() {
                     }
                 }
             } catch (e: Exception) {
-                // In caso di errore, usa badge di demo
-                userBadges.value = listOf(
-                    Badge(1, "Eco Starter", "Hai completato il primo quiz", ""),
-                    Badge(2, "Green Thumb", "Hai piantato il tuo primo albero virtuale", "")
-                )
             }
         }
     }
@@ -848,16 +859,6 @@ class MainScreenViewModel : ViewModel() {
         currentTab.value = tabIndex
     }
 
-    /**
-     * Nasconde il banner dei giochi
-     */
-    fun hideGamesBanner() {
-        showGamesBanner.value = false
-    }
-
-    /**
-     * Crea una nuova classe
-     */
     fun createClass(newClass: ClassRoom) {
         viewModelScope.launch {
             val token = UserSession.getAuthHeader()

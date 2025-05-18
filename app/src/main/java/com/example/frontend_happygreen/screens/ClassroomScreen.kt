@@ -80,6 +80,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.UUID
 import android.net.Uri
+import android.util.Log
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.AlertDialog
@@ -145,10 +146,37 @@ class ClassroomViewModel : ViewModel() {
     var isLoading = mutableStateOf(false)
     var errorMessage = mutableStateOf<String?>(null)
 
+
+    object DateUtils {
+        private val API_DATE_FORMAT = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+        private val UI_DATE_FORMAT = SimpleDateFormat("dd MMM HH:mm", Locale.getDefault())
+
+        fun parseApiDate(dateString: String?): Date {
+            return try {
+                dateString?.let { API_DATE_FORMAT.parse(it) } ?: Date()
+            } catch (e: Exception) {
+                Log.e("DateUtils", "Errore parsing data: $dateString", e)
+                Date()
+            }
+        }
+
+        fun formatDateForUi(date: Date): String {
+            return UI_DATE_FORMAT.format(date)
+        }
+    }
+
     /**
+     *
      * Carica i dati di un gruppo e i suoi post
      */
     fun loadGroupData(groupId: Int) {
+        // Controllo validità ID
+        if (groupId <= 0) {
+            errorMessage.value = "ID gruppo non valido"
+            isLoading.value = false
+            return
+        }
+
         viewModelScope.launch {
             isLoading.value = true
             errorMessage.value = null
@@ -175,7 +203,7 @@ class ClassroomViewModel : ViewModel() {
                     if (postsResponse.isSuccessful && postsResponse.body() != null) {
                         val posts = postsResponse.body()!!
 
-                        // Converti in ClassPost
+                        // Converti in ClassPost con gestione errori migliorata
                         _posts.value = posts.map { post ->
                             val author = groupData.members.find { it.user.id == post.userId }?.user
                             val userRole = groupData.members.find { it.user.id == post.userId }?.role
@@ -186,33 +214,45 @@ class ClassroomViewModel : ViewModel() {
                                 isTeacher = userRole == "teacher" || userRole == "admin",
                                 content = post.caption ?: "",
                                 imageUrl = post.imageUrl,
-                                // Converti la data da stringa a Date
-                                timestamp = try {
-                                    SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
-                                        .parse(post.createdAt ?: "") ?: Date()
-                                } catch (e: Exception) {
-                                    Date()
-                                },
-                                // Per ora le reazioni non sono implementate nel backend
+                                timestamp = DateUtils.parseApiDate(post.createdAt),
                                 reactions = emptyMap(),
-                                // TODO: Caricare i commenti associati a questo post
                                 comments = emptyList()
                             )
                         }
                     } else {
+                        val errorBody = postsResponse.errorBody()?.string() ?: "Errore sconosciuto"
+                        Log.e("ClassroomViewModel", "Errore caricamento post: ${postsResponse.code()} - $errorBody")
                         errorMessage.value = "Errore nel caricamento dei post: ${postsResponse.code()}"
-                        // Mostra dati di esempio in caso di errore
-                        _posts.value = getSamplePosts()
+                        // Fallback solo se necessario
+                        if (_posts.value.isEmpty()) {
+                            _posts.value = getSamplePosts()
+                        }
                     }
                 } else {
+                    val errorBody = groupResponse.errorBody()?.string() ?: "Errore sconosciuto"
+                    Log.e("ClassroomViewModel", "Errore caricamento gruppo: ${groupResponse.code()} - $errorBody")
                     errorMessage.value = "Errore nel caricamento del gruppo: ${groupResponse.code()}"
-                    // Mostra dati di esempio in caso di errore
-                    _posts.value = getSamplePosts()
+                    // Fallback solo se necessario
+                    if (_posts.value.isEmpty()) {
+                        _posts.value = getSamplePosts()
+                    }
                 }
             } catch (e: Exception) {
-                errorMessage.value = "Errore di connessione: ${e.message}"
-                // Mostra dati di esempio in caso di errore
-                _posts.value = getSamplePosts()
+                // Logging dettagliato per debug
+                Log.e("ClassroomViewModel", "Eccezione: ${e.message}", e)
+
+                when (e) {
+                    is java.net.UnknownHostException,
+                    is java.net.SocketTimeoutException ->
+                        errorMessage.value = "Errore di connessione. Controlla la tua connessione internet."
+                    else ->
+                        errorMessage.value = "Errore: ${e.message}"
+                }
+
+                // Fallback solo se necessario
+                if (_posts.value.isEmpty()) {
+                    _posts.value = getSamplePosts()
+                }
             } finally {
                 isLoading.value = false
             }
@@ -223,6 +263,13 @@ class ClassroomViewModel : ViewModel() {
      * Pubblica un nuovo post nel gruppo
      */
     fun addPost(groupId: Int, content: String, imageUri: Uri? = null) {
+        // Controllo validità ID
+        if (groupId <= 0) {
+            errorMessage.value = "ID gruppo non valido"
+            isLoading.value = false
+            return
+        }
+
         viewModelScope.launch {
             isLoading.value = true
             errorMessage.value = null
@@ -240,13 +287,19 @@ class ClassroomViewModel : ViewModel() {
                     return@launch
                 }
 
-                // Crea oggetto post
+                // URL immagine di default per evitare errori 400
+                val defaultImageUrl = "https://happygreen.example.com/default-placeholder.jpg"
+
+                // Crea oggetto post con imageUrl sempre valida
                 val post = Post(
                     userId = userId,
                     groupId = groupId,
-                    imageUrl = imageUri?.toString() ?: "",
+                    imageUrl = imageUri?.toString() ?: defaultImageUrl,
                     caption = content
                 )
+
+                // Log per debugging
+                Log.d("ClassroomViewModel", "Invio post: $post")
 
                 // Invia il post al server
                 val response = apiService.createPost(post, token)
@@ -259,7 +312,9 @@ class ClassroomViewModel : ViewModel() {
                     selectedImageUri.value = null
                     showPostInput.value = false
                 } else {
-                    errorMessage.value = "Errore nella pubblicazione del post: ${response.code()}"
+                    val errorBody = response.errorBody()?.string() ?: "Errore sconosciuto"
+                    Log.e("ClassroomViewModel", "Errore creazione post: ${response.code()} - $errorBody")
+                    errorMessage.value = "Errore nella pubblicazione del post: ${response.code()} - $errorBody"
 
                     // Fallback: aggiungi post localmente
                     val newPost = ClassPost(
@@ -270,6 +325,7 @@ class ClassroomViewModel : ViewModel() {
                     _posts.value = listOf(newPost) + _posts.value
                 }
             } catch (e: Exception) {
+                Log.e("ClassroomViewModel", "Eccezione creazione post: ${e.message}", e)
                 errorMessage.value = "Errore di connessione: ${e.message}"
 
                 // Fallback: aggiungi post localmente
@@ -420,9 +476,13 @@ fun ClassroomScreen(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
-    // Carica i dati del gruppo quando la schermata viene visualizzata
+    // Check valido prima di caricare i dati
     LaunchedEffect(classRoom.id) {
-        viewModel.loadGroupData(classRoom.id)
+        if (classRoom.id > 0) {
+            viewModel.loadGroupData(classRoom.id)
+        } else {
+            viewModel.errorMessage.value = "ID gruppo non valido"
+        }
     }
 
     // Image picker
@@ -451,7 +511,6 @@ fun ClassroomScreen(
             }
         )
     }
-
     Scaffold(
         topBar = {
             ClassroomTopBar(
