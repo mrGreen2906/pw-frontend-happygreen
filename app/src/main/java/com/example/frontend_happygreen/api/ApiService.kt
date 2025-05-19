@@ -1,3 +1,5 @@
+// ApiService.kt - Aggiornato con Like e Reactions
+
 package com.example.frontend_happygreen.api
 
 import com.example.frontend_happygreen.data.*
@@ -44,13 +46,39 @@ interface ApiService {
     @GET("posts/")
     suspend fun getPosts(@Header("Authorization") token: String): Response<List<Post>>
 
-    // ApiService.kt - Aggiungere questo metodo
+    @GET("posts/")
+    suspend fun getGroupPosts(
+        @Query("group") groupId: Int,
+        @Header("Authorization") token: String
+    ): Response<List<PostResponse>>
 
+    @POST("posts/")
+    suspend fun createPost(@Body post: Post, @Header("Authorization") token: String): Response<Post>
 
+    // NUOVO: Like endpoint
+    @POST("posts/{id}/toggle_like/")
+    suspend fun togglePostLike(
+        @Path("id") postId: Int,
+        @Header("Authorization") token: String
+    ): Response<LikeResponse>
 
-// Rimuovere o modificare questo metodo esistente se non serve più:
-// @POST("groups/{id}/add_member/")
-// suspend fun addGroupMember(...)
+    // NUOVO: Reactions endpoint
+    @POST("posts/{id}/add_reaction/")
+    suspend fun addPostReaction(
+        @Path("id") postId: Int,
+        @Body reaction: Map<String, String>,
+        @Header("Authorization") token: String
+    ): Response<ReactionResponse>
+
+    @GET("posts/{id}/reactions/")
+    suspend fun getPostReactions(
+        @Path("id") postId: Int,
+        @Header("Authorization") token: String
+    ): Response<Map<String, List<ReactionUser>>>
+
+    // Comments
+    @POST("comments/")
+    suspend fun createComment(@Body comment: Comment, @Header("Authorization") token: String): Response<Comment>
 
     // Badges
     @GET("badges/")
@@ -82,7 +110,7 @@ interface ApiService {
         @Body request: UpdatePointsRequest
     ): Response<UpdatePointsResponse>
 
-    // Aggiungi questi metodi a ApiService.kt
+    // Groups management
     @GET("groups/{id}/")
     suspend fun getGroupById(
         @Path("id") id: Int,
@@ -102,53 +130,90 @@ interface ApiService {
         @Header("Authorization") token: String
     ): Response<Unit>
 
-    @POST("groups/{id}/change_role/")
-    suspend fun changeGroupMemberRole(
-        @Path("id") groupId: Int,
-        @Body request: ChangeRoleRequest,
-        @Header("Authorization") token: String
-    ): Response<GroupMembership>
-
     @GET("groups/my_groups/")
     suspend fun getMyGroups(
         @Header("Authorization") token: String
     ): Response<List<Group>>
-
-    @GET("posts/")
-    suspend fun getGroupPosts(
-        @Query("group") groupId: Int,
-        @Header("Authorization") token: String
-    ): Response<List<Post>>
-
-    @POST("posts/")
-    suspend fun createPost(
-        @Body post: Post,
-        @Header("Authorization") token: String
-    ): Response<Post>
-
-    @POST("comments/")
-    suspend fun createComment(
-        @Body comment: Comment,
-        @Header("Authorization") token: String
-    ): Response<Comment>
 }
 
 // Classi per le richieste e risposte
 data class UpdatePointsRequest(
     val points: Int,
-    val game_id: String  // Modificato per match con il backend
+    val game_id: String
 )
 
 data class UpdatePointsResponse(
     val success: Boolean,
     val message: String,
-    val total_points: Int  // Modificato per match con il backend
+    val total_points: Int
 )
 
 data class LeaderboardResponse(
     val userId: Int,
     val username: String,
-    val score: Int? = null,  // Per classifiche di gioco specifiche
-    val ecoPoints: Int? = null,  // Per classifica globale
+    val score: Int? = null,
+    val ecoPoints: Int? = null,
     val avatar: String? = null
+)
+
+// NUOVO: Response per like
+data class LikeResponse(
+    val liked: Boolean,
+    val likeCount: Int
+)
+
+// NUOVO: Response per reactions
+data class ReactionResponse(
+    val removed: Boolean,
+    val userReaction: String?,
+    val reactionsCount: Map<String, Int>
+)
+
+// NUOVO: User che ha messo reaction
+data class ReactionUser(
+    val userId: Int,
+    val username: String,
+    val createdAt: String
+)
+
+// AGGIORNATO: Post response completo con like, reactions e commenti
+data class PostResponse(
+    val id: Int,
+    val user: UserData,
+    val groupId: Int,
+    val imageUrl: String?,
+    val caption: String?,
+    val latitude: Double?,
+    val longitude: Double?,
+    val createdAt: String?,
+    val comments: List<CommentResponse>? = null,
+    val likes: List<LikeData>? = null,
+    val reactions: List<ReactionData>? = null,
+    val likeCount: Int? = null,
+    val commentCount: Int? = null,
+    val userLiked: Boolean? = null,
+    val userReaction: String? = null
+)
+
+// NUOVO: Comment response con user details
+data class CommentResponse(
+    val id: Int,
+    val user: UserData,
+    val content: String,
+    val createdAt: String
+)
+
+// NUOVO: Like data
+data class LikeData(
+    val id: Int,
+    val user: UserData,
+    val createdAt: String
+)
+
+// NUOVO: Reaction data
+data class ReactionData(
+    val id: Int,
+    val user: UserData,
+    val reaction: String,
+    val createdAt: String
 )
