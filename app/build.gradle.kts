@@ -43,6 +43,17 @@ android {
 }
 
 dependencies {
+    // OSMDroid per mappe open source
+    implementation("org.osmdroid:osmdroid-android:6.1.16")
+
+// Google Play Services Location
+    implementation("com.google.android.gms:play-services-location:21.0.1")
+
+    // Material Icons Extended per icone aggiuntive
+    implementation("androidx.compose.material:material-icons-extended:1.5.4")
+
+// ViewModel per Compose
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
 
     implementation ("com.squareup.retrofit2:retrofit:2.9.0")
     implementation ("com.squareup.retrofit2:converter-gson:2.9.0")

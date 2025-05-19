@@ -1,4 +1,4 @@
-// MainScreen.kt aggiornato con classifica integrata
+// MainScreen.kt aggiornato con classifica integrata ed eco-centers
 
 package com.example.frontend_happygreen.screens
 
@@ -10,7 +10,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -35,14 +35,20 @@ import androidx.compose.material.icons.filled.CropFree
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Forest
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.GroupAdd
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -56,6 +62,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -82,38 +89,34 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.frontend_happygreen.R
+import com.example.frontend_happygreen.api.ApiService
+import com.example.frontend_happygreen.api.RetrofitClient
 import com.example.frontend_happygreen.barcode.BarcodeScannerScreen
+import com.example.frontend_happygreen.data.Badge
+import com.example.frontend_happygreen.data.Group
+import com.example.frontend_happygreen.data.Post
+import com.example.frontend_happygreen.data.UserSession
 import com.example.frontend_happygreen.games.EcoDetectiveGameScreen
 import com.example.frontend_happygreen.games.EcoGameScreen
+import com.example.frontend_happygreen.ui.components.CenteredLoader
 import com.example.frontend_happygreen.ui.components.SectionHeader
+import com.example.frontend_happygreen.ui.theme.Blue500
 import com.example.frontend_happygreen.ui.theme.Green100
 import com.example.frontend_happygreen.ui.theme.Green300
 import com.example.frontend_happygreen.ui.theme.Green600
 import com.example.frontend_happygreen.ui.theme.Green800
-import kotlinx.coroutines.launch
-import androidx.lifecycle.viewModelScope
-import com.example.frontend_happygreen.api.ApiService
-import com.example.frontend_happygreen.api.RetrofitClient
-import com.example.frontend_happygreen.data.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.GroupAdd
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.People
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.*
-import androidx.compose.ui.text.style.TextOverflow
-import com.example.frontend_happygreen.ui.components.CenteredLoader
-import com.example.frontend_happygreen.ui.theme.Blue500
+import kotlinx.coroutines.launch
 
 class MainScreenViewModel : ViewModel() {
     private val apiService = RetrofitClient.create(ApiService::class.java)
@@ -838,6 +841,7 @@ class MainScreenViewModel : ViewModel() {
         leaderboardData.value = emptyList()
     }
 }
+
 typealias ClassRoom = com.example.frontend_happygreen.data.ClassRoom
 
 data class Game(
@@ -863,6 +867,7 @@ fun MainScreen(
     var showEcoDetectiveGame by remember { mutableStateOf(false) }
     var showEcoSfidaGame by remember { mutableStateOf(false) }
     var showLeaderboardScreen by remember { mutableStateOf(false) }
+    var showEcoCenterMap by remember { mutableStateOf(false) }
     var showBarcodeScanner by remember { mutableStateOf(false) }
     var showClassroomScreen by remember { mutableStateOf<ClassRoom?>(null) }
     var showCreateClassDialog by remember { mutableStateOf(false) }
@@ -922,6 +927,9 @@ fun MainScreen(
         }
         showLeaderboardScreen -> viewModel.LeaderboardScreen(
             onBack = { showLeaderboardScreen = false }
+        )
+        showEcoCenterMap -> EcoCentersMapScreen(
+            onBack = { showEcoCenterMap = false }
         )
         showClassroomScreen != null -> {
             // CORRETTO: Verifica l'ID prima di navigare
@@ -987,7 +995,8 @@ fun MainScreen(
                 }
             },
             onBarcodeScanClick = { showBarcodeScanner = true },
-            onLeaderboardClick = { showLeaderboardScreen = true }
+            onLeaderboardClick = { showLeaderboardScreen = true },
+            onEcoCenterMapClick = { showEcoCenterMap = true }
         )
     }
 
@@ -1495,7 +1504,8 @@ fun MainAppScaffold(
     onClassSelected: (ClassRoom) -> Unit,
     onGameSelected: (String) -> Unit,
     onBarcodeScanClick: () -> Unit = {},
-    onLeaderboardClick: () -> Unit
+    onLeaderboardClick: () -> Unit,
+    onEcoCenterMapClick: () -> Unit = {}
 ) {
     var showEcoAIChat by remember { mutableStateOf(false) }
     var showGamesScreen by remember { mutableStateOf(false) }
@@ -1607,6 +1617,9 @@ fun MainAppScaffold(
                                     },
                                     onCreateGroupClick = onCreateClassClick,
                                     onJoinGroupClick = onJoinClassClick
+                                )
+                                1 -> ExploreContent(
+                                    onEcoCenterMapClick = onEcoCenterMapClick
                                 )
                                 3 -> ProfileContent(
                                     userName = userName,
