@@ -44,6 +44,13 @@ interface ApiService {
     @GET("posts/")
     suspend fun getPosts(@Header("Authorization") token: String): Response<List<Post>>
 
+    // ApiService.kt - Aggiungere questo metodo
+
+
+
+// Rimuovere o modificare questo metodo esistente se non serve più:
+// @POST("groups/{id}/add_member/")
+// suspend fun addGroupMember(...)
 
     // Badges
     @GET("badges/")
@@ -82,10 +89,9 @@ interface ApiService {
         @Header("Authorization") token: String
     ): Response<GroupDetailResponse>
 
-    @POST("groups/{id}/add_member/")
-    suspend fun addGroupMember(
+    @POST("groups/{id}/join/")
+    suspend fun joinGroup(
         @Path("id") groupId: Int,
-        @Body request: AddMemberRequest,
         @Header("Authorization") token: String
     ): Response<GroupMembership>
 

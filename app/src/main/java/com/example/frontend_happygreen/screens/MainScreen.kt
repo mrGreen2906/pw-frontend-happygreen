@@ -629,18 +629,32 @@ class MainScreenViewModel : ViewModel() {
     fun joinGroup(groupId: Int, onSuccess: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
             try {
-                val token = UserSession.getAuthHeader() ?: return@launch
-                val userId = UserSession.getUserId() ?: return@launch
+                val token = UserSession.getAuthHeader() ?: run {
+                    onError("Devi effettuare l'accesso per unirti a un gruppo")
+                    return@launch
+                }
 
-                val request = AddMemberRequest(userId = userId)
-                val response = apiService.addGroupMember(groupId, request, token)
+                // Usa il nuovo endpoint join invece di add_member
+                val response = apiService.joinGroup(groupId, token)
 
                 if (response.isSuccessful) {
                     // Ricarica i gruppi dell'utente
                     loadUserGroups()
                     onSuccess()
                 } else {
-                    onError("Impossibile unirsi al gruppo: ${response.code()}")
+                    val errorMsg = when (response.code()) {
+                        400 -> {
+                            val errorBody = response.errorBody()?.string() ?: ""
+                            when {
+                                errorBody.contains("già membro") -> "Sei già membro di questo gruppo"
+                                else -> "Richiesta non valida"
+                            }
+                        }
+                        403 -> "Non hai i permessi per unirti a questo gruppo"
+                        404 -> "Gruppo non trovato"
+                        else -> "Errore nell'unirsi al gruppo: ${response.code()}"
+                    }
+                    onError(errorMsg)
                 }
             } catch (e: Exception) {
                 onError("Errore di connessione: ${e.message}")
