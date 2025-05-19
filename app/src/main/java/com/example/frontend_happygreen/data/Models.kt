@@ -237,11 +237,6 @@ data class RemoveMemberRequest(
     @SerializedName("user_id") val userId: Int
 )
 
-data class ChangeRoleRequest(
-    @SerializedName("user_id") val userId: Int,
-    val role: String
-)
-
 // Risposta alla richiesta di aggiungere un membro
 typealias MembershipResponse = GroupMembership
 
@@ -256,7 +251,7 @@ data class Post(
     val longitude: Double? = null,
     @SerializedName("created_at") val createdAt: String? = null,
 
-    // NUOVO: Campi per like, reactions e commenti (dal serializer)
+    // Campi per like, reactions e commenti (dal serializer)
     val comments: List<CommentResponse>? = null,
     val likes: List<LikeData>? = null,
     val reactions: List<ReactionData>? = null,
@@ -264,26 +259,8 @@ data class Post(
     @SerializedName("comment_count") val commentCount: Int? = null,
     @SerializedName("user_liked") val userLiked: Boolean? = null,
     @SerializedName("user_reaction") val userReaction: String? = null
-) {
-    /**
-     * Verifica se il post ha dati validi
-     */
-    fun isValid(): Boolean {
-        return userId > 0 && groupId > 0 && !caption.isNullOrBlank()
-    }
+)
 
-    /**
-     * Determina se ha un'immagine valida
-     */
-    fun hasValidImage(): Boolean {
-        return !imageUrl.isNullOrBlank() &&
-                imageUrl != "https://happygreen.example.com/default-placeholder.jpg"
-    }
-}
-
-/**
- * AGGIORNATO: Response per post con tutti i dati
- */
 data class PostResponse(
     val id: Int,
     val user: UserData,
@@ -311,7 +288,13 @@ data class CommentResponse(
     val content: String,
     @SerializedName("created_at") val createdAt: String
 )
-
+data class CreatePostRequest(
+    @SerializedName("group") val groupId: Int,
+    @SerializedName("image_url") val imageUrl: String = "https://happygreen.example.com/default-placeholder.jpg",
+    val caption: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null
+)
 /**
  * NUOVO: Like data dal server
  */

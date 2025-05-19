@@ -3,6 +3,7 @@
 package com.example.frontend_happygreen.api
 
 import com.example.frontend_happygreen.data.*
+import com.google.gson.annotations.SerializedName
 import retrofit2.Response
 import retrofit2.http.*
 
@@ -42,15 +43,18 @@ interface ApiService {
     @GET("group-memberships/")
     suspend fun getGroupMemberships(@Header("Authorization") token: String): Response<List<GroupMembership>>
 
-    // Posts
     @GET("posts/")
-    suspend fun getPosts(@Header("Authorization") token: String): Response<List<Post>>
+    suspend fun getPosts(@Header("Authorization") token: String): Response<List<PostResponse>>
 
     @GET("posts/")
     suspend fun getGroupPosts(
         @Query("group") groupId: Int,
         @Header("Authorization") token: String
     ): Response<List<PostResponse>>
+
+    // CORRETTO: Usa Post per POST requests (invio dati)
+    @POST("posts/")
+    suspend fun createPost(@Body post: CreatePostRequest, @Header("Authorization") token: String): Response<PostResponse>
 
     @POST("posts/")
     suspend fun createPost(@Body post: Post, @Header("Authorization") token: String): Response<Post>
@@ -147,7 +151,13 @@ data class UpdatePointsResponse(
     val message: String,
     val total_points: Int
 )
-
+data class CreatePostRequest(
+    @SerializedName("group") val groupId: Int,
+    @SerializedName("image_url") val imageUrl: String = "https://happygreen.example.com/default-placeholder.jpg",
+    val caption: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null
+)
 data class LeaderboardResponse(
     val userId: Int,
     val username: String,
@@ -180,7 +190,7 @@ data class ReactionUser(
 data class PostResponse(
     val id: Int,
     val user: UserData,
-    val groupId: Int,
+    val group: Int,
     val imageUrl: String?,
     val caption: String?,
     val latitude: Double?,

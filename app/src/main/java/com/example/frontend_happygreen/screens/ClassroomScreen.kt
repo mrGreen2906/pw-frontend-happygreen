@@ -106,6 +106,7 @@ import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.viewModelScope
 import com.example.frontend_happygreen.api.ApiService
+import com.example.frontend_happygreen.api.CreatePostRequest
 import com.example.frontend_happygreen.api.RetrofitClient
 import com.example.frontend_happygreen.data.Comment
 import com.example.frontend_happygreen.data.MemberData
@@ -265,7 +266,7 @@ class ClassroomViewModel : ViewModel() {
 
                         // Converte i post del API in ClassPost con dati completi
                         val processedPosts = posts
-                            .filter { it.groupId == groupId }
+                            .filter { it.group == groupId }
                             .map { post ->
                                 val author = groupData.members.find { it.user.id == post.user.id }?.user
                                 val userRole = groupData.members.find { it.user.id == post.user.id }?.role
@@ -355,6 +356,9 @@ class ClassroomViewModel : ViewModel() {
     /**
      * Pubblica un nuovo post NEL GRUPPO SPECIFICO
      */
+    /**
+     * Pubblica un nuovo post NEL GRUPPO SPECIFICO - VERSIONE CORRETTA
+     */
     fun addPost(groupId: Int, content: String, imageUri: Uri? = null) {
         if (groupId <= 0) {
             errorMessage.value = "ID gruppo non valido: $groupId"
@@ -378,30 +382,22 @@ class ClassroomViewModel : ViewModel() {
                     return@launch
                 }
 
-                val userId = UserSession.getUserId() ?: run {
-                    errorMessage.value = "ID utente non disponibile"
-                    isLoading.value = false
-                    return@launch
-                }
-
-                val defaultImageUrl = "https://happygreen.example.com/default-placeholder.jpg"
-
-                val post = Post(
-                    userId = userId,
+                // CORRETTO: Usa CreatePostRequest invece di Post
+                val createPostRequest = CreatePostRequest(
                     groupId = groupId,
-                    imageUrl = imageUri?.toString() ?: defaultImageUrl,
+                    imageUrl = imageUri?.toString() ?: "https://happygreen.example.com/default-placeholder.jpg",
                     caption = content
                 )
 
-                Log.d("ClassroomViewModel", "Creating post in group $groupId: $post")
+                Log.d("ClassroomViewModel", "Creating post in group $groupId: $createPostRequest")
 
-                val response = apiService.createPost(post, token)
+                val response = apiService.createPost(createPostRequest, token)
 
                 if (response.isSuccessful && response.body() != null) {
                     val createdPost = response.body()!!
 
-                    if (createdPost.groupId != groupId) {
-                        Log.e("ClassroomViewModel", "ERROR: Created post belongs to group ${createdPost.groupId}, expected $groupId")
+                    if (createdPost.group != groupId) {
+                        Log.e("ClassroomViewModel", "ERROR: Created post belongs to group ${createdPost.group}, expected $groupId")
                         errorMessage.value = "Errore: post creato nel gruppo sbagliato"
                     } else {
                         Log.d("ClassroomViewModel", "Post created successfully in group $groupId with ID ${createdPost.id}")
@@ -574,12 +570,11 @@ class ClassroomViewModel : ViewModel() {
                         if (post.id == postId) {
                             post.copy(
                                 userReaction = result.userReaction,
-                                reactions = result.reactionsCount
+                                reactions = result.reactionsCount ?: emptyMap()
                             )
-                        } else {
-                            post
-                        }
-                    }
+                        } else post
+                    }.toList() // 🔁 questo forzerà la notifica se stai usando uno StateFlow
+
                 } else {
                     Log.e("ClassroomViewModel", "Error adding reaction: ${response.code()}")
                 }
@@ -1443,13 +1438,6 @@ fun EnhancedClassroomPostCard(
                     isActive = showCommentInput,
                     onClick = { showCommentInput = !showCommentInput }
                 )
-
-                EnhancedActionButton(
-                    icon = Icons.Default.Share,
-                    text = "Condividi",
-                    isActive = false,
-                    onClick = { /* implement sharing */ }
-                )
             }
 
             // Reaction selector popup
@@ -1684,7 +1672,7 @@ fun EnhancedCommentItem(comment: PostComment) {
             // Timestamp e azioni
             Row(
                 modifier = Modifier.padding(start = 4.dp, top = 4.dp),
-                verticalAlignment = Alignment.Center as Alignment.Vertical,
+                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
