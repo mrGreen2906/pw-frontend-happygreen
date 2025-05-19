@@ -117,9 +117,16 @@ import com.example.frontend_happygreen.ui.theme.Green300
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+import java.util.Calendar
+import java.util.TimeZone
 
 /**
  * Data Models per la UI dei post con like e reactions
+ */
+/**
+ * Data Models per la UI dei post con like e reactions - VERSIONE CORRETTA
  */
 data class ClassPost(
     val id: String = UUID.randomUUID().toString(),
@@ -128,7 +135,8 @@ data class ClassPost(
     val isTeacher: Boolean = false,
     val content: String,
     val imageUrl: String? = null,
-    val timestamp: Date = Date(),
+    // FIX: Non usare Date() come default, usa null
+    val timestamp: Date,
     val reactions: Map<String, Int> = emptyMap(), // emoji -> count
     val comments: List<PostComment> = emptyList(),
     val liked: Boolean = false,
@@ -141,7 +149,8 @@ data class PostComment(
     val authorName: String,
     val authorAvatarId: Int = R.drawable.happy_green_logo,
     val content: String,
-    val timestamp: Date = Date()
+    // FIX: Non usare Date() come default
+    val timestamp: Date
 )
 
 /**
@@ -168,22 +177,67 @@ class ClassroomViewModel : ViewModel() {
 
     // ID del gruppo corrente per gestire il reset
     private var currentGroupId: Int = -1
+// In ClassroomScreen.kt - DateUtils migliorato
 
     object DateUtils {
-        private val API_DATE_FORMAT = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+        // Formatti per parsing delle date dal backend
+        private val API_DATE_FORMATS = listOf(
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") },
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") },
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") },
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US),
+            SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+        )
+
         private val UI_DATE_FORMAT = SimpleDateFormat("dd MMM HH:mm", Locale.getDefault())
+        private val UI_DATE_FORMAT_WITH_YEAR = SimpleDateFormat("dd MMM yyyy HH:mm", Locale.getDefault())
 
         fun parseApiDate(dateString: String?): Date {
-            return try {
-                dateString?.let { API_DATE_FORMAT.parse(it) } ?: Date()
-            } catch (e: Exception) {
-                Log.e("DateUtils", "Errore parsing data: $dateString", e)
-                Date()
+            if (dateString.isNullOrBlank()) {
+                Log.w("DateUtils", "Date string is null or blank")
+                return Date()
             }
+
+            Log.d("DateUtils", "Parsing date: $dateString")
+
+            for (format in API_DATE_FORMATS) {
+                try {
+                    val parsedDate = format.parse(dateString)
+                    if (parsedDate != null) {
+                        Log.d("DateUtils", "Successfully parsed date: $dateString -> $parsedDate")
+                        return parsedDate
+                    }
+                } catch (e: Exception) {
+                    // Continua con il prossimo formato
+                    continue
+                }
+            }
+
+            Log.e("DateUtils", "Failed to parse date: $dateString")
+            // Come fallback, restituisce la data corrente
+            return Date()
         }
 
         fun formatDateForUi(date: Date): String {
-            return UI_DATE_FORMAT.format(date)
+            val now = Date()
+            val diffInMillis = now.time - date.time
+            val diffInDays = diffInMillis / (24 * 60 * 60 * 1000)
+
+            return when {
+                diffInDays > 365 -> UI_DATE_FORMAT_WITH_YEAR.format(date)
+                else -> UI_DATE_FORMAT.format(date)
+            }
+        }
+
+        fun isToday(date: Date): Boolean {
+            val calendar1 = Calendar.getInstance()
+            calendar1.time = date
+
+            val calendar2 = Calendar.getInstance()
+            calendar2.time = Date()
+
+            return calendar1.get(Calendar.YEAR) == calendar2.get(Calendar.YEAR) &&
+                    calendar1.get(Calendar.DAY_OF_YEAR) == calendar2.get(Calendar.DAY_OF_YEAR)
         }
     }
 
@@ -268,16 +322,19 @@ class ClassroomViewModel : ViewModel() {
                         val processedPosts = posts
                             .filter { it.group == groupId }
                             .map { post ->
+                                Log.d("ClassroomViewModel", "Processing post ${post.id}, created_at: ${post.createdAt}")
+
                                 val author = groupData.members.find { it.user.id == post.user.id }?.user
                                 val userRole = groupData.members.find { it.user.id == post.user.id }?.role
 
-                                // Estrai le informazioni dalle response del post
+                                // Processa le reactions dal server
                                 val reactionsCounts = mutableMapOf<String, Int>()
                                 post.reactions?.forEach { reaction ->
-                                    reactionsCounts[reaction.reaction] = reactionsCounts.getOrDefault(reaction.reaction, 0) + 1
+                                    val emoji = reaction.reaction
+                                    reactionsCounts[emoji] = reactionsCounts.getOrDefault(emoji, 0) + 1
                                 }
 
-                                // Estrai i commenti
+                                // Processa i commenti
                                 val comments = post.comments?.map { comment ->
                                     PostComment(
                                         id = comment.id.toString(),
@@ -287,13 +344,21 @@ class ClassroomViewModel : ViewModel() {
                                     )
                                 } ?: emptyList()
 
+                                // Parse della data del post
+                                val postDate = DateUtils.parseApiDate(post.createdAt)
+                                Log.d("ClassroomViewModel", "Post ${post.id} parsed date: $postDate")
+
                                 ClassPost(
                                     id = post.id.toString(),
                                     authorName = author?.username ?: "Utente",
                                     isTeacher = userRole == "teacher" || userRole == "admin",
                                     content = post.caption ?: "",
-                                    imageUrl = if (post.imageUrl != "https://happygreen.example.com/default-placeholder.jpg") post.imageUrl else null,
-                                    timestamp = DateUtils.parseApiDate(post.createdAt),
+                                    imageUrl = when {
+                                        post.imageUrl.isNullOrBlank() -> null
+                                        post.imageUrl == "https://happygreen.example.com/default-placeholder.jpg" -> null
+                                        else -> post.imageUrl
+                                    },
+                                    timestamp = postDate,
                                     reactions = reactionsCounts,
                                     comments = comments,
                                     liked = post.userLiked ?: false,
@@ -301,12 +366,13 @@ class ClassroomViewModel : ViewModel() {
                                     userReaction = post.userReaction
                                 )
                             }
-                            .sortedByDescending { it.timestamp }
+                            .sortedByDescending { it.timestamp } // Ordina per timestamp dopo il parsing
 
-                        // Aggiorna i post SOLO se stiamo ancora visualizzando lo stesso gruppo
+                        Log.d("ClassroomViewModel", "Processed ${processedPosts.size} posts, ordered by: ${processedPosts.map { "${it.id}: ${it.timestamp}" }}")
+
                         if (currentGroupId == groupId) {
                             _posts.value = processedPosts
-                            Log.d("ClassroomViewModel", "Successfully processed ${processedPosts.size} posts for group $groupId")
+                            Log.d("ClassroomViewModel", "Successfully updated posts for group $groupId")
                         }
 
                     } else {
@@ -338,8 +404,8 @@ class ClassroomViewModel : ViewModel() {
 
                 if (currentGroupId == groupId) {
                     when (e) {
-                        is java.net.UnknownHostException,
-                        is java.net.SocketTimeoutException ->
+                        is UnknownHostException,
+                        is SocketTimeoutException ->
                             errorMessage.value = "Errore di connessione. Controlla la tua connessione internet."
                         else ->
                             errorMessage.value = "Errore: ${e.message}"
@@ -382,10 +448,19 @@ class ClassroomViewModel : ViewModel() {
                     return@launch
                 }
 
-                // CORRETTO: Usa CreatePostRequest invece di Post
+                // FIX: Gestione corretta dell'URL dell'immagine
+                val imageUrl = when {
+                    imageUri != null -> {
+                        // Qui dovresti implementare l'upload dell'immagine al server
+                        // Per ora usiamo l'URI come stringa (NON IDEALE per produzione)
+                        imageUri.toString()
+                    }
+                    else -> "" // URL vuoto invece del placeholder
+                }
+
                 val createPostRequest = CreatePostRequest(
                     groupId = groupId,
-                    imageUrl = imageUri?.toString() ?: "https://happygreen.example.com/default-placeholder.jpg",
+                    imageUrl = imageUrl,
                     caption = content
                 )
 
@@ -403,6 +478,7 @@ class ClassroomViewModel : ViewModel() {
                         Log.d("ClassroomViewModel", "Post created successfully in group $groupId with ID ${createdPost.id}")
                     }
 
+                    // FIX: Ricarica solo se siamo ancora nello stesso gruppo
                     if (currentGroupId == groupId) {
                         loadGroupData(groupId)
                     }
@@ -427,9 +503,7 @@ class ClassroomViewModel : ViewModel() {
             } finally {
                 if (currentGroupId == groupId) {
                     isLoading.value = false
-                    newPostContent.value = ""
-                    selectedImageUri.value = null
-                    showPostInput.value = false
+                    // Non resettare i campi qui in caso di errore
                 }
             }
         }
@@ -489,7 +563,10 @@ class ClassroomViewModel : ViewModel() {
             if (post.id == postId) {
                 val newComment = PostComment(
                     authorName = UserSession.getUsername() ?: "Tu",
-                    content = content
+                    content = content,
+                    id = TODO(),
+                    authorAvatarId = TODO(),
+                    timestamp = TODO(),
                 )
                 post.copy(comments = post.comments + newComment)
             } else {
@@ -507,12 +584,27 @@ class ClassroomViewModel : ViewModel() {
                 val token = UserSession.getAuthHeader() ?: return@launch
                 val postIdInt = postId.toIntOrNull() ?: return@launch
 
+                // FIX: Prima aggiorna localmente per feedback immediato
+                val currentPost = _posts.value.find { it.id == postId }
+                if (currentPost != null) {
+                    val newLiked = !currentPost.liked
+                    val newCount = if (newLiked) currentPost.likeCount + 1 else (currentPost.likeCount - 1).coerceAtLeast(0)
+
+                    val updatedPost = currentPost.copy(
+                        liked = newLiked,
+                        likeCount = newCount
+                    )
+
+                    _posts.value = _posts.value.map { if (it.id == postId) updatedPost else it }
+                }
+
+                // Poi invia la richiesta al server
                 val response = apiService.togglePostLike(postIdInt, token)
 
                 if (response.isSuccessful && response.body() != null) {
                     val result = response.body()!!
 
-                    // Aggiorna il post localmente
+                    // Sincronizza con la risposta del server
                     _posts.value = _posts.value.map { post ->
                         if (post.id == postId) {
                             post.copy(
@@ -524,29 +616,14 @@ class ClassroomViewModel : ViewModel() {
                         }
                     }
                 } else {
-                    // Fallback: toggle locale
-                    _posts.value = _posts.value.map { post ->
-                        if (post.id == postId) {
-                            val newLiked = !post.liked
-                            val newCount = if (newLiked) post.likeCount + 1 else post.likeCount - 1
-                            post.copy(liked = newLiked, likeCount = newCount.coerceAtLeast(0))
-                        } else {
-                            post
-                        }
-                    }
+                    Log.e("ClassroomViewModel", "Error toggling like: ${response.code()}")
+                    // In caso di errore, ricarica i dati del gruppo
+                    loadGroupData(currentGroupId)
                 }
             } catch (e: Exception) {
                 Log.e("ClassroomViewModel", "Error toggling like: ${e.message}", e)
-                // Fallback: toggle locale
-                _posts.value = _posts.value.map { post ->
-                    if (post.id == postId) {
-                        val newLiked = !post.liked
-                        val newCount = if (newLiked) post.likeCount + 1 else post.likeCount - 1
-                        post.copy(liked = newLiked, likeCount = newCount.coerceAtLeast(0))
-                    } else {
-                        post
-                    }
-                }
+                // In caso di errore, ricarica i dati del gruppo
+                loadGroupData(currentGroupId)
             }
         }
     }
@@ -560,50 +637,74 @@ class ClassroomViewModel : ViewModel() {
                 val token = UserSession.getAuthHeader() ?: return@launch
                 val postIdInt = postId.toIntOrNull() ?: return@launch
 
+                // FIX: Prima aggiorna localmente per feedback immediato
+                val currentPost = _posts.value.find { it.id == postId }
+                if (currentPost != null) {
+                    val updatedReactions = currentPost.reactions.toMutableMap()
+                    val currentUserReaction = currentPost.userReaction
+
+                    if (currentUserReaction == emoji) {
+                        // Rimuovi la reaction esistente
+                        if (updatedReactions[emoji] != null) {
+                            updatedReactions[emoji] = (updatedReactions[emoji]!! - 1).coerceAtLeast(0)
+                            if (updatedReactions[emoji] == 0) {
+                                updatedReactions.remove(emoji)
+                            }
+                        }
+                        val updatedPost = currentPost.copy(
+                            reactions = updatedReactions,
+                            userReaction = null
+                        )
+
+                        _posts.value = _posts.value.map { if (it.id == postId) updatedPost else it }
+                    } else {
+                        // Rimuovi la vecchia reaction se esiste
+                        if (currentUserReaction != null && updatedReactions[currentUserReaction] != null) {
+                            updatedReactions[currentUserReaction] = (updatedReactions[currentUserReaction]!! - 1).coerceAtLeast(0)
+                            if (updatedReactions[currentUserReaction] == 0) {
+                                updatedReactions.remove(currentUserReaction)
+                            }
+                        }
+
+                        // Aggiungi la nuova reaction
+                        updatedReactions[emoji] = (updatedReactions[emoji] ?: 0) + 1
+
+                        val updatedPost = currentPost.copy(
+                            reactions = updatedReactions,
+                            userReaction = emoji
+                        )
+
+                        _posts.value = _posts.value.map { if (it.id == postId) updatedPost else it }
+                    }
+                }
+
+                // Poi invia la richiesta al server
                 val response = apiService.addPostReaction(postIdInt, mapOf("reaction" to emoji), token)
 
                 if (response.isSuccessful && response.body() != null) {
                     val result = response.body()!!
 
-                    // Aggiorna il post localmente
+                    // Sincronizza con la risposta del server
                     _posts.value = _posts.value.map { post ->
                         if (post.id == postId) {
                             post.copy(
                                 userReaction = result.userReaction,
-                                reactions = result.reactionsCount ?: emptyMap()
+                                reactions = result.reactionsCount
                             )
                         } else post
-                    }.toList() // 🔁 questo forzerà la notifica se stai usando uno StateFlow
-
+                    }
                 } else {
                     Log.e("ClassroomViewModel", "Error adding reaction: ${response.code()}")
+                    // In caso di errore, ricarica i dati del gruppo
+                    loadGroupData(currentGroupId)
                 }
             } catch (e: Exception) {
                 Log.e("ClassroomViewModel", "Exception adding reaction: ${e.message}", e)
+                // In caso di errore, ricarica i dati del gruppo
+                loadGroupData(currentGroupId)
             }
         }
     }
-
-    /**
-     * Reset completo del ViewModel
-     */
-    fun resetAll() {
-        Log.d("ClassroomViewModel", "Resetting all data")
-        currentGroupId = -1
-        _posts.value = emptyList()
-        _members.value = emptyList()
-        newPostContent.value = ""
-        selectedImageUri.value = null
-        showPostInput.value = false
-        showImagePreview.value = false
-        isLoading.value = false
-        errorMessage.value = null
-    }
-
-    /**
-     * Getter per il gruppo corrente
-     */
-    fun getCurrentGroupId(): Int = currentGroupId
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
