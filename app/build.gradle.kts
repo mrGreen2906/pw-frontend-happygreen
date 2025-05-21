@@ -43,6 +43,18 @@ android {
 }
 
 dependencies {
+    implementation ("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation ("com.squareup.retrofit2:converter-gson:2.9.0")
+
+    // Gson for JSON parsing
+    implementation ("com.google.code.gson:gson:2.10.1")
+
+    // Coroutines for async operations
+    implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+
+    // Lifecycle components
+    implementation ("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
+    implementation ("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     // OSMDroid per mappe open source
     implementation("org.osmdroid:osmdroid-android:6.1.16")
 

@@ -1585,11 +1585,10 @@ fun MainAppScaffold(
     onLeaderboardClick: () -> Unit,
     onEcoCenterMapClick: () -> Unit = {}
 ) {
-    var showEcoAIChat by remember { mutableStateOf(false) }
     var showGamesScreen by remember { mutableStateOf(false) }
     var selectedClassroom by remember { mutableStateOf<ClassRoom?>(null) }
     var showEcoCenterMapState by remember { mutableStateOf(false) }
-
+    var showEcoAIChat by remember { mutableStateOf(false) }
     // Log per debug
     LaunchedEffect(selectedClassroom) {
         selectedClassroom?.let { classroom ->
@@ -1672,18 +1671,16 @@ fun MainAppScaffold(
                     }
                 },
                 floatingActionButton = {
-                    Column(horizontalAlignment = Alignment.End) {
-                        FloatingActionButton(
-                            onClick = { showEcoAIChat = true },
-                            containerColor = Color(0xFF009688),
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ChatBubble,
-                                contentDescription = "Chiedi a EcoAI",
-                                tint = Color.White
-                            )
-                        }
+                    FloatingActionButton(
+                        onClick = { showEcoAIChat = true },
+                        containerColor = Green600,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ChatBubble,
+                            contentDescription = "Chiedi a EcoAI",
+                            tint = Color.White
+                        )
                     }
                 }
             ) { innerPadding ->

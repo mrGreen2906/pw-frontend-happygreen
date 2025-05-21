@@ -28,11 +28,6 @@
         android:theme="@style/Theme.Frontendhappygreen"
         tools:targetApi="31"
         android:usesCleartextTraffic="true">
-        <network-security-config>
-            <domain-config android:cleartextTrafficPermitted="true">
-                <domain android:includeSubdomains="true">eu.jotform.com</domain>
-            </domain-config>
-        </network-security-config>
         <activity
             android:name=".MainActivity"
             android:exported="true"
