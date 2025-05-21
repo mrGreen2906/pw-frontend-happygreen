@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -40,7 +39,6 @@ import androidx.compose.material.icons.filled.GroupAdd
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Logout
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
@@ -55,6 +53,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -82,8 +82,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -135,14 +138,12 @@ class MainScreenViewModel : ViewModel() {
     var classes = mutableStateOf<List<ClassRoom>>(emptyList())
     var availableGames = mutableStateOf<List<Game>>(emptyList())
     var userBadges = mutableStateOf<List<Badge>>(emptyList())
-    var showGamesBanner = mutableStateOf(true)
     var currentTab = mutableStateOf(0)
     var hasNotifications = mutableStateOf(false)
     var notificationCount = mutableStateOf(0)
 
     // Post dell'utente
     private val _userPosts = MutableStateFlow<List<Post>>(emptyList())
-    val userPosts: StateFlow<List<Post>> = _userPosts.asStateFlow()
 
     // Per i punteggi
     var leaderboardData = mutableStateOf<List<LeaderboardItems>>(emptyList())
@@ -234,7 +235,6 @@ class MainScreenViewModel : ViewModel() {
     ) {
         val leaderboardData by viewModel.leaderboardData
         val isLoading by viewModel.isLoadingLeaderboard
-        val selectedGame by viewModel.selectedGameForLeaderboard
         val error by viewModel.errorMessage
 
         var selectedTab by remember { mutableStateOf(0) }
@@ -1075,25 +1075,60 @@ fun HomeContent(
                     fontWeight = FontWeight.Bold
                 )
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
-                        onClick = onJoinGroupClick,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Blue500
-                        )
+                // Singolo pulsante FAB con menu a comparsa
+                Box {
+                    var expanded by remember { mutableStateOf(false) }
+
+                    FloatingActionButton(
+                        onClick = { expanded = true },
+                        containerColor = Green600,
+                        modifier = Modifier.size(48.dp)
                     ) {
-                        Icon(imageVector = Icons.Default.GroupAdd, contentDescription = "Unisciti a gruppo")
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Cerca Gruppo")
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Gruppi",
+                            tint = Color.White
+                        )
                     }
 
-                    Button(
-                        onClick = onCreateGroupClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = Green600)
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
                     ) {
-                        Icon(imageVector = Icons.Default.Add, contentDescription = "Crea gruppo")
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Crea Gruppo")
+                        DropdownMenuItem(
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.GroupAdd,
+                                        contentDescription = null,
+                                        tint = Green600
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Cerca Gruppo")
+                                }
+                            },
+                            onClick = {
+                                expanded = false
+                                onJoinGroupClick()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = null,
+                                        tint = Green600
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Crea Gruppo")
+                                }
+                            },
+                            onClick = {
+                                expanded = false
+                                onCreateGroupClick()
+                            }
+                        )
                     }
                 }
             }
@@ -1102,13 +1137,10 @@ fun HomeContent(
 
         if (classList.isEmpty()) {
             item(key = "empty_state") {
-                EmptyGroupsCard(
-                    onCreateGroupClick = onCreateGroupClick,
-                    onJoinGroupClick = onJoinGroupClick
-                )
+                EmptyGroupsCard()
             }
         } else {
-            // CORRETTO: Usa itemsIndexed con chiave stabile e unica
+            // Usa itemsIndexed con chiave stabile e unica
             itemsIndexed(
                 items = classList,
                 key = { index, classRoom ->
@@ -1116,7 +1148,7 @@ fun HomeContent(
                     "class_${classRoom.id}_${classRoom.name}_$index"
                 }
             ) { index, classRoom ->
-                // CORRETTO: Validazione prima di mostrare la carta
+                // Validazione prima di mostrare la carta
                 if (classRoom.isValid()) {
                     EnhancedClassCard(
                         classRoom = classRoom,
@@ -1159,19 +1191,22 @@ fun HomeContent(
                 }
             }
         }
+
+        // Aggiungere un FAB fisso in basso per creare/unirsi a gruppi
+        item {
+            Spacer(modifier = Modifier.height(80.dp)) // Spazio in fondo per evitare sovrapposizioni
+        }
     }
 }
 
 @Composable
-private fun EmptyGroupsCard(
-    onCreateGroupClick: () -> Unit,
-    onJoinGroupClick: () -> Unit
-) {
+private fun EmptyGroupsCard() {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 32.dp),
-        colors = CardDefaults.cardColors(containerColor = Green100)
+        colors = CardDefaults.cardColors(containerColor = Green100),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
             modifier = Modifier
@@ -1179,57 +1214,54 @@ private fun EmptyGroupsCard(
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(
-                imageVector = Icons.Default.Group,
-                contentDescription = null,
-                tint = Green600,
-                modifier = Modifier.size(48.dp)
-            )
+            // Icona più grande e con animazione
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(CircleShape)
+                    .background(Green300.copy(alpha = 0.3f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Group,
+                    contentDescription = null,
+                    tint = Green600,
+                    modifier = Modifier.size(48.dp)
+                )
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
+
             Text(
                 text = "Non sei ancora iscritto a nessun gruppo",
                 style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center
             )
+
             Spacer(modifier = Modifier.height(8.dp))
+
             Text(
-                text = "Crea un nuovo gruppo o unisciti a uno esistente per condividere foto e luoghi eco-friendly con i tuoi amici",
+                text = "Usa il pulsante + in alto per creare un nuovo gruppo o unirti a un gruppo esistente.",
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
                 color = Color.Gray
             )
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Button(
-                    onClick = onJoinGroupClick,
-                    colors = ButtonDefaults.buttonColors(containerColor = Blue500),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(imageVector = Icons.Default.Search, contentDescription = null)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Trova gruppi")
-                }
 
-                Button(
-                    onClick = onCreateGroupClick,
-                    colors = ButtonDefaults.buttonColors(containerColor = Green600),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(imageVector = Icons.Default.Add, contentDescription = null)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Crea gruppo")
-                }
-            }
+            // Aggiunta illustrazione o animazione
+            Spacer(modifier = Modifier.height(16.dp))
+            Image(
+                painter = painterResource(id = R.drawable.happy_green_logo),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(120.dp)
+                    .alpha(0.7f),
+                contentScale = ContentScale.Fit
+            )
         }
     }
 }
 
-/**
- * CORRETTO: EnhancedClassCard con validazione e debug migliorati
- */
 @Composable
 fun EnhancedClassCard(
     classRoom: ClassRoom,
@@ -1241,10 +1273,10 @@ fun EnhancedClassCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(160.dp)
+            .height(180.dp) // Altezza leggermente aumentata
             .clickable(enabled = isValid, onClick = onClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isValid) Color.White else Color.Gray.copy(alpha = 0.3f)
         )
@@ -1259,11 +1291,18 @@ fun EnhancedClassCard(
                 alpha = if (isValid) 1f else 0.5f
             )
 
-            // Overlay scuro
+            // Overlay con gradiente per migliorare la leggibilità
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = if (isValid) 0.4f else 0.6f))
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.1f),
+                                Color.Black.copy(alpha = 0.7f)
+                            )
+                        )
+                    )
             )
 
             // Contenuto
@@ -1273,7 +1312,7 @@ fun EnhancedClassCard(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                // Badge superiore
+                // Badge superiore in una row per allineamento
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -1282,14 +1321,25 @@ fun EnhancedClassCard(
                         colors = CardDefaults.cardColors(
                             containerColor = if (isValid) Green600 else Color.Gray
                         ),
-                        shape = RoundedCornerShape(4.dp)
+                        shape = RoundedCornerShape(50.dp) // Bordi più arrotondati
                     ) {
-                        Text(
-                            text = if (isValid) "Gruppo Attivo" else "Gruppo Non Valido",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .background(Color.White, CircleShape)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (isValid) "Gruppo Attivo" else "Gruppo Non Valido",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
 
                     // Mostra ID per debug se non valido
@@ -1316,67 +1366,97 @@ fun EnhancedClassCard(
                         text = classRoom.name,
                         style = MaterialTheme.typography.titleLarge,
                         color = Color.White,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
 
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    Text(
-                        text = classRoom.teacherName,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.9f)
-                    )
+                    // Badge con icona per il teacherName
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = if (classRoom.userRole == "admin")
+                                Icons.Default.Person else Icons.Default.Group,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.9f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = classRoom.teacherName,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
 
                     // Descrizione se presente
                     if (classRoom.description.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = classRoom.description,
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.7f),
-                            maxLines = 1,
+                            color = Color.White.copy(alpha = 0.8f),
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                    // Icone informative
+                    // Icone informative in card semi-trasparenti
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color.White.copy(alpha = 0.2f)
+                            ),
+                            shape = RoundedCornerShape(50.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.People,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "${classRoom.memberCount} membri",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.People,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = "${classRoom.memberCount} membri",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.White
+                                )
+                            }
                         }
 
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color.White.copy(alpha = 0.2f)
+                            ),
+                            shape = RoundedCornerShape(50.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Image,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "0 post", // Sarà aggiornato in futuro
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Image,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = "0 post", // Sarà aggiornato in futuro
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.White
+                                )
+                            }
                         }
                     }
                 }
@@ -1385,9 +1465,6 @@ fun EnhancedClassCard(
     }
 }
 
-/**
- * Create Group Dialog aggiornato
- */
 @Composable
 fun CreateClassDialog(
     onDismiss: () -> Unit,
@@ -1482,6 +1559,7 @@ fun CreateClassDialog(
     }
 }
 
+
 @Composable
 fun MainAppScaffold(
     currentTab: Int,
@@ -1510,12 +1588,18 @@ fun MainAppScaffold(
     var showEcoAIChat by remember { mutableStateOf(false) }
     var showGamesScreen by remember { mutableStateOf(false) }
     var selectedClassroom by remember { mutableStateOf<ClassRoom?>(null) }
+    var showEcoCenterMapState by remember { mutableStateOf(false) }
 
     // Log per debug
     LaunchedEffect(selectedClassroom) {
         selectedClassroom?.let { classroom ->
             Log.d("MainAppScaffold", "Navigating to classroom: ${classroom.name} with ID: ${classroom.id}")
         }
+    }
+
+    // When the Explore tab (index 1) is selected, automatically show the map
+    LaunchedEffect(currentTab) {
+        showEcoCenterMapState = currentTab == 1
     }
 
     // Handle different screens based on navigation state
@@ -1531,6 +1615,14 @@ fun MainAppScaffold(
                     onGameSelected(gameId)
                 },
                 onBack = { showGamesScreen = false }
+            )
+        }
+        showEcoCenterMapState -> {
+            EcoCentersMapScreen(
+                onBack = {
+                    showEcoCenterMapState = false
+                    onTabSelected(0) // Return to Home tab after closing the map
+                }
             )
         }
         selectedClassroom != null -> {
@@ -1618,9 +1710,6 @@ fun MainAppScaffold(
                                     onCreateGroupClick = onCreateClassClick,
                                     onJoinGroupClick = onJoinClassClick
                                 )
-                                1 -> ExploreContent(
-                                    onEcoCenterMapClick = onEcoCenterMapClick
-                                )
                                 3 -> ProfileContent(
                                     userName = userName,
                                     userEmail = userEmail,
@@ -1656,225 +1745,6 @@ data class BadgeItem(
     val description: String,
     val iconUrl: String
 )
-
-// MainAppScaffold
-@Composable
-fun GroupsTab(
-    classList: List<ClassRoom>,
-    onClassSelected: (ClassRoom) -> Unit,
-    onCreateClassClick: () -> Unit,
-    onJoinClassClick: () -> Unit
-) {
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        item {
-            WelcomeHeader()
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "I tuoi gruppi",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Green800,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Row {
-                    // Pulsante per unirsi a una classe esistente
-                    TextButton(
-                        onClick = onJoinClassClick,
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = Green600
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.GroupAdd,
-                            contentDescription = "Unisciti a un gruppo",
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Unisciti")
-                    }
-
-                    // Pulsante per creare una nuova classe
-                    TextButton(
-                        onClick = onCreateClassClick,
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = Green600
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Crea gruppo",
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Crea")
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-        }
-
-        // Se non ci sono classi, mostra un messaggio
-        if (classList.isEmpty()) {
-            item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 32.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Green100
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Group,
-                            contentDescription = null,
-                            tint = Green600,
-                            modifier = Modifier.size(48.dp)
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "Non sei ancora iscritto a nessun gruppo",
-                            style = MaterialTheme.typography.titleMedium,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Crea un nuovo gruppo o unisciti a uno esistente per condividere foto e luoghi eco-friendly con i tuoi amici",
-                            style = MaterialTheme.typography.bodyMedium,
-                            textAlign = TextAlign.Center,
-                            color = Color.Gray
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(
-                            onClick = onCreateClassClick,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Green600
-                            )
-                        ) {
-                            Text("Crea gruppo")
-                        }
-                    }
-                }
-            }
-        } else {
-            // Mostra l'elenco delle classi
-            items(
-                items = classList,
-                key = { it.id }
-            ) { classRoom ->
-                EnhancedClassCard(
-                    classRoom = classRoom,
-                    onClick = { onClassSelected(classRoom) }
-                )
-            }
-        }
-    }
-}
-@Composable
-fun JoinGroupDialog(
-    onDismiss: () -> Unit,
-    onJoin: (String) -> Unit
-) {
-    var groupCode by remember { mutableStateOf("") }
-    var isJoining by remember { mutableStateOf(false) }
-
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Header
-                Text(
-                    text = "Unisciti a un Gruppo",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = Green800
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = "Inserisci il codice di invito fornito dall'amministratore del gruppo",
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center,
-                    color = Color.Gray
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Campo codice gruppo
-                OutlinedTextField(
-                    value = groupCode,
-                    onValueChange = { groupCode = it },
-                    label = { Text("Codice di invito") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Actions
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    TextButton(
-                        onClick = onDismiss
-                    ) {
-                        Text("Annulla")
-                    }
-
-                    Button(
-                        onClick = {
-                            if (groupCode.isNotBlank()) {
-                                isJoining = true
-                                onJoin(groupCode)
-                            }
-                        },
-                        enabled = groupCode.isNotBlank() && !isJoining,
-                        colors = ButtonDefaults.buttonColors(containerColor = Green600)
-                    ) {
-                        if (isJoining) {
-                            CircularProgressIndicator(
-                                color = Color.White,
-                                modifier = Modifier.size(24.dp),
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Text("Unisciti")
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 @Composable
 fun GameCard(
     game: Game,
@@ -2054,148 +1924,6 @@ fun GamesScreen(
     }
 }
 
-
-
-// Modifica alla chiamata di HomeContent in MainAppScaffold
-
-@Composable
-fun MainAppScaffold(
-    currentTab: Int,
-    tabItems: List<String>,
-    icons: List<ImageVector>,
-    hasNotifications: Boolean,
-    notificationCount: Int,
-    isLoading: Boolean,
-    classList: List<ClassRoom>,
-    gamesList: List<Game>,
-    userName: String,
-    userEmail: String,
-    userPoints: Int,
-    userLevel: String,
-    userBadges: List<BadgeItem>,
-    onTabSelected: (Int) -> Unit,
-    onProfileClick: () -> Unit,
-    onCreateClassClick: () -> Unit,
-    onClassSelected: (ClassRoom) -> Unit,
-    onGameSelected: (String) -> Unit,
-    onLeaderboardClick: () -> Unit,
-) {
-    var showEcoAIChat by remember { mutableStateOf(false) }
-    var showBarcodeScanner by remember { mutableStateOf(false) }
-    var showGamesScreen by remember { mutableStateOf(false) }
-    var selectedClassroom by remember { mutableStateOf<ClassRoom?>(null) }
-
-    // Handle different screens based on navigation state
-    when {
-        showEcoAIChat -> {
-            EcoAIChatScreen(onBack = { showEcoAIChat = false })
-        }
-        showBarcodeScanner -> {
-            BarcodeScannerScreen(onBack = { showBarcodeScanner = false })
-        }
-        showGamesScreen -> {
-            GamesScreen(
-                games = gamesList,
-                onGameSelected = { gameId ->
-                    showGamesScreen = false
-                    onGameSelected(gameId)
-                },
-                onBack = { showGamesScreen = false }
-            )
-        }
-        selectedClassroom != null -> {
-            ClassroomScreen(
-                classRoom = selectedClassroom!!,
-                onBack = { selectedClassroom = null }
-            )
-        }
-        else -> {
-            // Main app scaffold
-            Scaffold(
-                topBar = {
-                    AppTopBar(
-                        onProfileClick = onProfileClick,
-                        onGamesClick = { showGamesScreen = true },
-                        onLeaderboardClick = onLeaderboardClick,
-                    )
-                },
-                bottomBar = {
-                    NavigationBar {
-                        tabItems.forEachIndexed { index, item ->
-                            NavigationBarItem(
-                                icon = { Icon(icons[index], contentDescription = item) },
-                                label = { Text(item) },
-                                selected = currentTab == index,
-                                onClick = {
-                                    // Gestione speciale per il tab scanner
-                                    if (index == 2) { // Scanner tab
-                                        showBarcodeScanner = true
-                                    } else {
-                                        onTabSelected(index)
-                                    }
-                                }
-                            )
-                        }
-                    }
-                },
-                floatingActionButton = {
-                    Column(horizontalAlignment = Alignment.End) {
-                        FloatingActionButton(
-                            onClick = { showEcoAIChat = true },
-                            containerColor = Color(0xFF009688),
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ChatBubble,
-                                contentDescription = "Chiedi a EcoAI",
-                                tint = Color.White
-                            )
-                        }
-                    }
-                }
-            ) { innerPadding ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding)
-                        .background(Color.White)
-                ) {
-                    // Contenuto principale
-                    when {
-                        isLoading -> CenteredLoader(message = "Caricamento in corso...")
-                        else -> {
-                            when (currentTab) {
-                                0 -> HomeContent(
-                                    classList = classList,
-                                    onClassSelected = { classRoom ->
-                                        // Update the selected classroom to trigger navigation
-                                        selectedClassroom = classRoom
-                                    },
-                                    onCreateGroupClick = onCreateClassClick  // Passa la funzione di callback
-                                )
-                                3 -> ProfileContent(
-                                    userName = userName,
-                                    userEmail = userEmail,
-                                    userPoints = userPoints,
-                                    userLevel = userLevel,
-                                    userBadges = userBadges
-                                )
-                                else -> HomeContent(
-                                    classList = classList,
-                                    onClassSelected = { classRoom ->
-                                        // Update the selected classroom to trigger navigation
-                                        selectedClassroom = classRoom
-                                    },
-                                    onCreateGroupClick = onCreateClassClick  // Passa la funzione di callback
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 @Composable
 public fun AppTopBar(
     onProfileClick: () -> Unit,
@@ -2296,9 +2024,9 @@ public fun AppTopBar(
 fun UserAvatar(onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .size(48.dp) // Increased from 46dp
+            .size(40.dp)
             .clip(CircleShape)
-            .background(Color.LightGray)
+            .background(Color.White)
             .border(2.dp, Color.White, CircleShape)
             .clickable(onClick = onClick)
     ) {
@@ -2311,181 +2039,53 @@ fun UserAvatar(onClick: () -> Unit) {
     }
 }
 
-// Updated NotificationIcon function with larger size
-@Composable
-fun NotificationIcon(count: Int) {
-    Box(
-        modifier = Modifier
-            .padding(horizontal = 8.dp)
-            .size(48.dp) // Increased size to match avatar
-            .clip(CircleShape)
-            .background(Color.White.copy(alpha = 0.2f))
-            .clickable { /* Handle notifications */ }
-            .padding(8.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = Icons.Default.Notifications,
-            contentDescription = "Notifiche",
-            tint = Color.White,
-            modifier = Modifier.size(24.dp)
-        )
-
-        if (count > 0) {
-            Box(
-                modifier = Modifier
-                    .size(22.dp) // Increased size
-                    .align(Alignment.TopEnd)
-                    .offset(x = 6.dp, y = (-6).dp)
-                    .background(Color.Red, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = if (count > 9) "9+" else count.toString(),
-                    color = Color.White,
-                    style = MaterialTheme.typography.labelSmall,
-                    fontSize = 12.sp // Slightly increased
-                )
-            }
-        }
-    }
-}
-
-
 @Composable
 fun WelcomeHeader() {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(color = Green100, shape = RoundedCornerShape(16.dp))
-            .padding(16.dp)
-    ) {
-        Text(
-            text = "Benvenuto in HappyGreen!",
-            style = MaterialTheme.typography.titleLarge,
-            color = Green800
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = "Unisciti a classi eco-friendly e guadagna Green Points!",
-            style = MaterialTheme.typography.bodyMedium,
-            color = Green600
-        )
-    }
-}
-
-
-@Composable
-fun ClassCard(
-    classRoom: ClassRoom,
-    onClick: () -> Unit
-) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(120.dp)
-            .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        shape = RoundedCornerShape(12.dp)
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Green100),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Logo app
             Image(
-                painter = painterResource(id = classRoom.backgroundImageId),
+                painter = painterResource(id = R.drawable.happy_green_logo),
                 contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .size(60.dp)
+                    .clip(CircleShape)
+                    .border(2.dp, Green300, CircleShape)
+                    .padding(4.dp),
+                contentScale = ContentScale.Fit
             )
 
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.4f))
-            )
+            Spacer(modifier = Modifier.width(16.dp))
 
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.Bottom
-            ) {
+            Column {
                 Text(
-                    text = classRoom.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White,
-                    maxLines = 1
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Insegnante: ${classRoom.teacherName}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.8f),
-                    maxLines = 1
-                )
-            }
-        }
-    }
-}
-@Composable
-fun HomeContent(
-    classList: List<ClassRoom>,
-    onClassSelected: (ClassRoom) -> Unit,
-    onCreateGroupClick: () -> Unit = {}  // Aggiungi questo parametro
-) {
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        item {
-            WelcomeHeader()
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Le tue classi",
+                    text = "Benvenuto in HappyGreen!",
                     style = MaterialTheme.typography.titleLarge,
                     color = Green800,
                     fontWeight = FontWeight.Bold
                 )
 
-                // Pulsante per creare un nuovo gruppo
-                Button(
-                    onClick = onCreateGroupClick,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Green600
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Crea gruppo"
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Crea Gruppo")
-                }
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = "Unisciti a gruppi eco-friendly e guadagna Green Points!",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Green600
+                )
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
-        }
-
-        items(
-            items = classList,
-            key = { it.name }
-        ) { classRoom ->
-            ClassCard(
-                classRoom = classRoom,
-                onClick = { onClassSelected(classRoom) }
-            )
-            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }
+
+
 @Composable
 fun StatisticsItem(
     title: String,
@@ -2572,48 +2172,6 @@ fun PointsCard(points: Int, level: String) {
         }
     }
 }
-@Composable
-fun BadgeItem(name: String, iconId: Int) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(80.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(60.dp)
-                .clip(CircleShape)
-                .background(Green100)
-                .border(2.dp, Green300, CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Image(
-                painter = painterResource(id = iconId),
-                contentDescription = name,
-                modifier = Modifier.size(40.dp)
-            )
-        }
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = name,
-            style = MaterialTheme.typography.bodySmall,
-            maxLines = 1
-        )
-    }
-}
-
-@Composable
-fun BadgesRow() {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(8) { index ->
-            BadgeItem(
-                name = "Badge ${index + 1}",
-                iconId = R.drawable.happy_green_logo
-            )
-        }
-    }
-}
-// Profile Content
-// Updated ProfileContent to use real user data
 @Composable
 fun ProfileContent(
     userName: String,

@@ -100,20 +100,15 @@ class EcoAIChatViewModel : ViewModel() {
     suspend fun processUserMessage(message: String, imageUri: Uri? = null) {
         isLoading.value = true
 
-        // Add user message to the chat
         addUserMessage(message, imageUri)
 
-        // Simulate processing time
         delay(1500)
 
-        // Generate a response based on the input
         val response = if (imageUri != null) {
             generateImageResponse(imageUri)
         } else {
             generateTextResponse(message)
         }
-
-        // Add bot response
         addBotMessage(response)
 
         isLoading.value = false
@@ -123,8 +118,6 @@ class EcoAIChatViewModel : ViewModel() {
      * Generate a text response based on user input
      */
     private fun generateTextResponse(message: String): String {
-        // In a real app, this would call an AI service
-        // For now, we'll use some predefined responses
 
         return when {
             message.contains("plastica", ignoreCase = true) ->

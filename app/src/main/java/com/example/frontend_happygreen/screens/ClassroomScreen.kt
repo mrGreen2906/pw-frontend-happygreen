@@ -1,5 +1,3 @@
-// ClassroomScreen.kt - Versione Completa con Like e Reactions
-
 package com.example.frontend_happygreen.screens
 
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -32,7 +30,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
@@ -41,8 +38,6 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
@@ -61,7 +56,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -110,16 +104,13 @@ import com.example.frontend_happygreen.api.CreatePostRequest
 import com.example.frontend_happygreen.api.RetrofitClient
 import com.example.frontend_happygreen.data.Comment
 import com.example.frontend_happygreen.data.MemberData
-import com.example.frontend_happygreen.data.Post
 import com.example.frontend_happygreen.data.UserSession
 import com.example.frontend_happygreen.data.ClassRoom
 import com.example.frontend_happygreen.ui.theme.Green300
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
-import java.util.Calendar
 import java.util.TimeZone
 
 /**
@@ -165,7 +156,6 @@ class ClassroomViewModel : ViewModel() {
 
     // Membri del gruppo
     private val _members = MutableStateFlow<List<MemberData>>(emptyList())
-    val members: StateFlow<List<MemberData>> = _members
 
     // Stati UI
     var newPostContent = mutableStateOf("")
@@ -188,10 +178,6 @@ class ClassroomViewModel : ViewModel() {
             SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US),
             SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
         )
-
-        private val UI_DATE_FORMAT = SimpleDateFormat("dd MMM HH:mm", Locale.getDefault())
-        private val UI_DATE_FORMAT_WITH_YEAR = SimpleDateFormat("dd MMM yyyy HH:mm", Locale.getDefault())
-
         fun parseApiDate(dateString: String?): Date {
             if (dateString.isNullOrBlank()) {
                 Log.w("DateUtils", "Date string is null or blank")
@@ -216,28 +202,6 @@ class ClassroomViewModel : ViewModel() {
             Log.e("DateUtils", "Failed to parse date: $dateString")
             // Come fallback, restituisce la data corrente
             return Date()
-        }
-
-        fun formatDateForUi(date: Date): String {
-            val now = Date()
-            val diffInMillis = now.time - date.time
-            val diffInDays = diffInMillis / (24 * 60 * 60 * 1000)
-
-            return when {
-                diffInDays > 365 -> UI_DATE_FORMAT_WITH_YEAR.format(date)
-                else -> UI_DATE_FORMAT.format(date)
-            }
-        }
-
-        fun isToday(date: Date): Boolean {
-            val calendar1 = Calendar.getInstance()
-            calendar1.time = date
-
-            val calendar2 = Calendar.getInstance()
-            calendar2.time = Date()
-
-            return calendar1.get(Calendar.YEAR) == calendar2.get(Calendar.YEAR) &&
-                    calendar1.get(Calendar.DAY_OF_YEAR) == calendar2.get(Calendar.DAY_OF_YEAR)
         }
     }
 
@@ -564,9 +528,7 @@ class ClassroomViewModel : ViewModel() {
                 val newComment = PostComment(
                     authorName = UserSession.getUsername() ?: "Tu",
                     content = content,
-                    id = TODO(),
-                    authorAvatarId = TODO(),
-                    timestamp = TODO(),
+                    timestamp = Date()
                 )
                 post.copy(comments = post.comments + newComment)
             } else {

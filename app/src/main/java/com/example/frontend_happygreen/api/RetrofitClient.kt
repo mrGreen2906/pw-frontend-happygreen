@@ -9,9 +9,11 @@ import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
     private const val BASE_URL = "https://worm-shining-accurately.ngrok-free.app/"
+    private const val JOTFORM_BASE_URL = "https://eu.jotform.com/"
+
     private val okHttpClient by lazy {
         val loggingInterceptor = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY  // Set to BODY to see full request/response
+            level = HttpLoggingInterceptor.Level.BODY
         }
 
         OkHttpClient.Builder()
@@ -22,7 +24,7 @@ object RetrofitClient {
             .build()
     }
 
-    private val retrofit by lazy {
+    private val mainRetrofit by lazy {
         Retrofit.Builder()
             .baseUrl(BASE_URL)
             .client(okHttpClient)
@@ -30,10 +32,19 @@ object RetrofitClient {
             .build()
     }
 
+    private val jotformRetrofit by lazy {
+        Retrofit.Builder()
+            .baseUrl(JOTFORM_BASE_URL)
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+
     fun <T> create(service: Class<T>): T {
-        return retrofit.create(service)
+        return mainRetrofit.create(service)
+    }
+
+    fun <T> createJotformService(service: Class<T>): T {
+        return jotformRetrofit.create(service)
     }
 }
-
-
-
