@@ -126,8 +126,6 @@ data class ClassPost(
     val isTeacher: Boolean = false,
     val content: String,
     val imageUrl: String? = null,
-    // FIX: Non usare Date() come default, usa null
-    val timestamp: Date,
     val reactions: Map<String, Int> = emptyMap(), // emoji -> count
     val comments: List<PostComment> = emptyList(),
     val liked: Boolean = false,
@@ -140,8 +138,6 @@ data class PostComment(
     val authorName: String,
     val authorAvatarId: Int = R.drawable.happy_green_logo,
     val content: String,
-    // FIX: Non usare Date() come default
-    val timestamp: Date
 )
 
 /**
@@ -304,7 +300,6 @@ class ClassroomViewModel : ViewModel() {
                                         id = comment.id.toString(),
                                         authorName = comment.user.username,
                                         content = comment.content,
-                                        timestamp = DateUtils.parseApiDate(comment.createdAt)
                                     )
                                 } ?: emptyList()
 
@@ -322,7 +317,6 @@ class ClassroomViewModel : ViewModel() {
                                         post.imageUrl == "https://happygreen.example.com/default-placeholder.jpg" -> null
                                         else -> post.imageUrl
                                     },
-                                    timestamp = postDate,
                                     reactions = reactionsCounts,
                                     comments = comments,
                                     liked = post.userLiked ?: false,
@@ -330,9 +324,7 @@ class ClassroomViewModel : ViewModel() {
                                     userReaction = post.userReaction
                                 )
                             }
-                            .sortedByDescending { it.timestamp } // Ordina per timestamp dopo il parsing
 
-                        Log.d("ClassroomViewModel", "Processed ${processedPosts.size} posts, ordered by: ${processedPosts.map { "${it.id}: ${it.timestamp}" }}")
 
                         if (currentGroupId == groupId) {
                             _posts.value = processedPosts
@@ -528,7 +520,6 @@ class ClassroomViewModel : ViewModel() {
                 val newComment = PostComment(
                     authorName = UserSession.getUsername() ?: "Tu",
                     content = content,
-                    timestamp = Date()
                 )
                 post.copy(comments = post.comments + newComment)
             } else {
@@ -1354,15 +1345,7 @@ fun EnhancedClassroomPostCard(
                             )
                         }
                     }
-
-                    Text(
-                        text = timeFormatter.format(post.timestamp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Gray600
-                    )
                 }
-
-                // Menu opzioni
                 IconButton(
                     onClick = { /* show options */ },
                     modifier = Modifier.size(24.dp)
@@ -1730,29 +1713,6 @@ fun EnhancedCommentItem(comment: PostComment) {
                         lineHeight = 20.sp
                     )
                 }
-            }
-
-            // Timestamp e azioni
-            Row(
-                modifier = Modifier.padding(start = 4.dp, top = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(
-                    text = timeFormatter.format(comment.timestamp),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Gray600
-                )
-
-                Text(
-                    text = "Rispondi",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Green600,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.clickable {
-                        // Implement reply functionality
-                    }
-                )
             }
         }
     }

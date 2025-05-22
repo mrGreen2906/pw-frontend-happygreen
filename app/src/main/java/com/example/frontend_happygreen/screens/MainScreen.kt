@@ -783,9 +783,8 @@ class MainScreenViewModel : ViewModel() {
 
     private fun loadGames() {
         availableGames.value = listOf(
-            Game("eco_detective", "Eco Detective", "Smista i rifiuti nei cestini corretti", R.drawable.happy_green_logo),
-            Game("eco_sfida", "Eco Sfida", "Confronta l'impatto ambientale", R.drawable.happy_green_logo),
-            Game("tree_planter", "Tree Planter", "Simulatore di piantumazione", R.drawable.happy_green_logo)
+            Game("eco_detective", "Eco Detective", "Smista i rifiuti nei cestini corretti", R.drawable.detective),
+            Game("eco_sfida", "Eco Sfida", "Confronta l'impatto ambientale", R.drawable.ecogames),
         )
     }
 
@@ -891,7 +890,7 @@ fun MainScreen(
     // Local dialog states
     var showProfileDialog by remember { mutableStateOf(false) }
 
-    val tabItems = listOf("Home", "Esplora", "Scanner", "Profilo")
+    val tabItems = listOf("Home", "Esplora", "Scanner")
     val icons = listOf(
         Icons.Default.Home,
         Icons.Default.Search,
@@ -966,14 +965,6 @@ fun MainScreen(
             userEmail = userEmail,
             userPoints = userPoints,
             userLevel = userLevel,
-            userBadges = userBadges.map { badge ->
-                BadgeItem(
-                    id = badge.id,
-                    name = badge.name,
-                    description = badge.description,
-                    iconUrl = badge.iconUrl
-                )
-            },
             onTabSelected = viewModel::setCurrentTab,
             onProfileClick = { showProfileDialog = true },
             onCreateClassClick = { showCreateClassDialog = true },
@@ -1574,7 +1565,6 @@ fun MainAppScaffold(
     userEmail: String,
     userPoints: Int,
     userLevel: String,
-    userBadges: List<BadgeItem>,
     onTabSelected: (Int) -> Unit,
     onProfileClick: () -> Unit,
     onCreateClassClick: () -> Unit,
@@ -1707,13 +1697,6 @@ fun MainAppScaffold(
                                     onCreateGroupClick = onCreateClassClick,
                                     onJoinGroupClick = onJoinClassClick
                                 )
-                                3 -> ProfileContent(
-                                    userName = userName,
-                                    userEmail = userEmail,
-                                    userPoints = userPoints,
-                                    userLevel = userLevel,
-                                    userBadges = userBadges
-                                )
                                 else -> HomeContent(
                                     classList = classList,
                                     onClassSelected = { classRoom ->
@@ -1735,13 +1718,6 @@ fun MainAppScaffold(
         }
     }
 }
-// Data model for badges in UI
-data class BadgeItem(
-    val id: Int,
-    val name: String,
-    val description: String,
-    val iconUrl: String
-)
 @Composable
 fun GameCard(
     game: Game,
@@ -2113,35 +2089,6 @@ fun StatisticsItem(
         )
     }
 }
-
-
-@Composable
-fun StatisticsCard() {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            StatisticsItem(
-                title = "Rifiuti riciclati",
-                value = "324 kg",
-                icon = Icons.Default.Delete
-            )
-            Divider(modifier = Modifier.padding(vertical = 8.dp))
-            StatisticsItem(
-                title = "Alberi piantati",
-                value = "12",
-                icon = Icons.Default.Forest
-            )
-            Divider(modifier = Modifier.padding(vertical = 8.dp))
-            StatisticsItem(
-                title = "Quiz completati",
-                value = "35",
-                icon = Icons.Default.Check
-            )
-        }
-    }
-}
 @Composable
 fun PointsCard(points: Int, level: String) {
     Card(
@@ -2169,126 +2116,8 @@ fun PointsCard(points: Int, level: String) {
         }
     }
 }
-@Composable
-fun ProfileContent(
-    userName: String,
-    userEmail: String,
-    userPoints: Int,
-    userLevel: String,
-    userBadges: List<BadgeItem>
-) {
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        item {
-            // User avatar
-            Box(
-                modifier = Modifier
-                    .size(120.dp)
-                    .clip(CircleShape)
-                    .background(Green100)
-                    .border(2.dp, Green600, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.happy_green_logo),
-                    contentDescription = "Avatar",
-                    modifier = Modifier.size(80.dp)
-                )
-            }
 
-            Spacer(modifier = Modifier.height(16.dp))
 
-            Text(
-                text = userName,
-                style = MaterialTheme.typography.titleLarge
-            )
-
-            Text(
-                text = userEmail,
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.Gray
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-        }
-
-        item {
-            // Points card
-            PointsCard(points = userPoints, level = userLevel)
-            Spacer(modifier = Modifier.height(24.dp))
-        }
-
-        item {
-            // Badges section
-            SectionHeader(title = "Le mie badge")
-            Spacer(modifier = Modifier.height(8.dp))
-
-            if (userBadges.isEmpty()) {
-                Text(
-                    text = "Non hai ancora guadagnato nessuna badge",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.Gray,
-                    modifier = Modifier.padding(vertical = 12.dp)
-                )
-            } else {
-                BadgesRow(badges = userBadges)
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-        }
-
-        item {
-            // Statistics section
-            SectionHeader(title = "Le mie statistiche")
-            Spacer(modifier = Modifier.height(8.dp))
-            StatisticsCard()
-            Spacer(modifier = Modifier.height(80.dp))
-        }
-    }
-}
-
-@Composable
-fun BadgesRow(badges: List<BadgeItem>) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(badges.size) { index ->
-            val badge = badges[index]
-            BadgeItemUI(name = badge.name, iconId = R.drawable.happy_green_logo)
-        }
-    }
-}
-
-@Composable
-fun BadgeItemUI(name: String, iconId: Int) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(80.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(60.dp)
-                .clip(CircleShape)
-                .background(Green100)
-                .border(2.dp, Green300, CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Image(
-                painter = painterResource(id = iconId),
-                contentDescription = name,
-                modifier = Modifier.size(40.dp)
-            )
-        }
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = name,
-            style = MaterialTheme.typography.bodySmall,
-            maxLines = 1
-        )
-    }
-}
 
 // Updated ProfileDialog to use real user data
 @Composable

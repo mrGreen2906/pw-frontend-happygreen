@@ -6,11 +6,6 @@ import androidx.core.content.edit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-
-/**
- * Singleton che gestisce i dati di sessione dell'utente autenticato
- * Versione migliorata con StateFlow per reattività e migliore persistenza
- */
 object UserSession {
     // Chiavi per le SharedPreferences
     private const val PREFS_NAME = "happy_green_user_session"
