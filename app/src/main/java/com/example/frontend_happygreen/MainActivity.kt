@@ -3,24 +3,20 @@ package com.example.frontend_happygreen
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.compose.runtime.Composable
+import androidx.activity.viewModels
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.frontend_happygreen.audio.AudioController
 import com.example.frontend_happygreen.data.UserSession
 import com.example.frontend_happygreen.screens.AuthScreen
 import com.example.frontend_happygreen.screens.AuthViewModel
 import com.example.frontend_happygreen.screens.LoadingScreen
 import com.example.frontend_happygreen.screens.MainScreen
-import com.example.frontend_happygreen.screens.MainScreenViewModel
 import com.example.frontend_happygreen.screens.VerifyOTPScreen
 import com.example.frontend_happygreen.screens.WelcomeScreen
 import com.example.frontend_happygreen.ui.theme.FrontendhappygreenTheme
@@ -28,170 +24,183 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+    private val authViewModel: AuthViewModel by viewModels()
     private lateinit var audioController: AudioController
-    private var volumeLevel = 0.5f  // Default volume level
+
+    // Stati per la musica
+    private var volumeLevel by mutableStateOf(0.5f)
+    private var musicStarted = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Initialize audio controller
+        // Inizializza UserSession
+        UserSession.init(this)
+
+        // Inizializza AudioController
         audioController = AudioController(this)
 
-        // Start the background music immediately
-        audioController.startBackgroundMusic()
-
-        // Inizializza UserSession con l'applicazione
-        UserSession.init(applicationContext)
-
-        enableEdgeToEdge()
         setContent {
             FrontendhappygreenTheme {
-                // Track volume level state
-                var currentVolumeLevel by remember { mutableFloatStateOf(volumeLevel) }
+                var showMainApp by remember { mutableStateOf(false) }
+                var showWelcome by remember { mutableStateOf(true) }
+                var currentScreen by remember { mutableStateOf<Screen>(Screen.Loading) }
+                var needsVerification by remember { mutableStateOf<Int?>(null) }
 
-                HappyGreenApp(
-                    onVolumeChange = { newVolume ->
-                        currentVolumeLevel = newVolume
-                        audioController.setVolume(newVolume)
-                        volumeLevel = newVolume // Save to activity field
-                    },
-                    volumeLevel = currentVolumeLevel
-                )
+                // Osserva lo stato di login
+                val isLoggedIn by UserSession.isLoggedInFlow.collectAsState()
+
+                LaunchedEffect(isLoggedIn) {
+                    when {
+                        isLoggedIn -> {
+                            currentScreen = Screen.Main
+                            showWelcome = false
+                            showMainApp = true
+
+                            // Avvia la musica quando l'utente è loggato
+                            if (!musicStarted) {
+                                startBackgroundMusic()
+                                musicStarted = true
+                            }
+                        }
+                        else -> {
+                            currentScreen = Screen.Welcome
+                            showMainApp = false
+                            showWelcome = true
+
+                            // Ferma la musica quando l'utente non è loggato
+                            if (musicStarted) {
+                                stopBackgroundMusic()
+                                musicStarted = false
+                            }
+                        }
+                    }
+                }
+
+                when (currentScreen) {
+                    Screen.Loading -> {
+                        LoadingScreen(onLoadingComplete = {
+                            lifecycleScope.launch {
+                                val loggedIn = UserSession.isLoggedInFlow.first()
+                                currentScreen = if (loggedIn) Screen.Main else Screen.Welcome
+                            }
+                        })
+                    }
+
+                    Screen.Welcome -> {
+                        if (showWelcome) {
+                            WelcomeScreen(
+                                onGetStartedClick = {
+                                    showWelcome = false
+                                    currentScreen = Screen.Auth
+                                }
+                            )
+                        } else {
+                            AuthScreen(
+                                onAuthComplete = {
+                                    currentScreen = Screen.Main
+                                    showMainApp = true
+                                },
+                                onNeedVerification = { userId ->
+                                    needsVerification = userId
+                                    currentScreen = Screen.Verification
+                                }
+                            )
+                        }
+                    }
+
+                    Screen.Verification -> {
+                        needsVerification?.let { userId ->
+                            VerifyOTPScreen(
+                                userId = userId,
+                                onVerificationComplete = {
+                                    needsVerification = null
+                                    currentScreen = Screen.Main
+                                    showMainApp = true
+                                }
+                            )
+                        }
+                    }
+
+                    Screen.Main -> {
+                        if (showMainApp) {
+                            MainScreen(
+                                volumeLevel = volumeLevel,
+                                onVolumeChange = { newVolume ->
+                                    volumeLevel = newVolume
+                                    audioController.setVolume(newVolume)
+                                },
+                                onLogout = {
+                                    // Ferma la musica al logout
+                                    stopBackgroundMusic()
+                                    musicStarted = false
+
+                                    currentScreen = Screen.Welcome
+                                    showWelcome = true
+                                    showMainApp = false
+                                }
+                            )
+                        }
+                    }
+
+                    else -> {}
+                }
             }
         }
+    }
 
-        // Salva le preferenze per l'audio quando l'activity viene distrutta
-        // per garantire la persistenza anche in caso di cambio configurazione
-        getPreferences(MODE_PRIVATE).edit().putFloat("volume_level", volumeLevel).apply()
+    private fun startBackgroundMusic() {
+        audioController.startBackgroundMusic()
+        audioController.setVolume(volumeLevel)
+    }
+
+    private fun stopBackgroundMusic() {
+        audioController.stopBackgroundMusic()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Pausa la musica quando l'app va in background
+        if (musicStarted && audioController.isPlaying()) {
+            audioController.pauseMusic()
+        }
     }
 
     override fun onResume() {
         super.onResume()
-        // Carica le preferenze dell'audio quando l'activity viene ripresa
-        volumeLevel = getPreferences(MODE_PRIVATE).getFloat("volume_level", 0.5f)
-        audioController.setVolume(volumeLevel)
+        // Riprendi la musica quando l'app torna in foreground
+        if (musicStarted && !audioController.isPlaying()) {
+            audioController.resumeMusic()
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        // Ferma completamente la musica quando l'Activity viene distrutta
+        if (musicStarted) {
+            stopBackgroundMusic()
+            musicStarted = false
+        }
         audioController.unbind()
     }
-}
 
-@Composable
-fun HappyGreenApp(
-    onVolumeChange: (Float) -> Unit = {},
-    volumeLevel: Float = 0.5f
-) {
-    val mainScreenViewModel: MainScreenViewModel = viewModel()
-    // Stato attuale dell'autenticazione
-    val isLoggedIn by UserSession.isLoggedInFlow.collectAsState(initial = false)
-
-    // Stato della schermata
-    var currentScreen by remember { mutableStateOf<Screen>(Screen.Welcome) }
-    var userId by remember { mutableStateOf<Int?>(null) }
-
-    // Usiamo un effetto che esegue solo all'avvio
-
-    // FLUSSO PRINCIPALE DELL'APP
-    when (currentScreen) {
-        Screen.Welcome -> {
-            WelcomeScreen(
-                onGetStartedClick = {
-                    // Qui forziamo il passaggio alla schermata Auth
-                    currentScreen = Screen.Auth
-                }
-            )
+    // Gestisce il pulsante back del sistema
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        // Ferma la musica quando l'utente esce dall'app
+        if (musicStarted) {
+            stopBackgroundMusic()
+            musicStarted = false
         }
-
-        Screen.Auth -> {
-            AuthScreen(
-                onAuthComplete = {
-                    // Se l'autenticazione è completata, passa alla schermata Loading
-                    if (isLoggedIn) {
-                        currentScreen = Screen.Loading
-                    }
-                },
-                onNeedVerification = { id ->
-                    userId = id
-                    currentScreen = Screen.VerifyOTP
-                }
-            )
-
-            // Se l'utente viene autenticato mentre è già nella schermata di auth
-            LaunchedEffect(isLoggedIn) {
-                if (isLoggedIn) {
-                    currentScreen = Screen.Loading
-                }
-            }
-        }
-
-        Screen.VerifyOTP -> {
-            userId?.let { id ->
-                VerifyOTPScreen(
-                    userId = id,
-                    onVerificationComplete = {
-                        if (isLoggedIn) {
-                            currentScreen = Screen.Loading
-                        } else {
-                            // Se non siamo ancora loggati, torna alla schermata di auth
-                            currentScreen = Screen.Auth
-                        }
-                    }
-                )
-            } ?: run {
-                // Se userId è null, torna alla schermata di autenticazione
-                currentScreen = Screen.Auth
-            }
-
-            // Se l'utente viene autenticato durante la verifica
-            LaunchedEffect(isLoggedIn) {
-                if (isLoggedIn) {
-                    currentScreen = Screen.Loading
-                    mainScreenViewModel.refreshData()
-                }
-            }
-        }
-
-        Screen.Loading -> {
-            // Verifica che l'utente sia effettivamente loggato
-            if (isLoggedIn) {
-                LoadingScreen(
-                    onLoadingComplete = { currentScreen = Screen.Main }
-                )
-            } else {
-                // Non sei loggato? Torna alla schermata di auth
-                LaunchedEffect(Unit) {
-                    currentScreen = Screen.Auth
-                }
-            }
-        }
-
-        Screen.Main -> {
-            // Verifica costantemente che l'utente sia loggato
-            if (isLoggedIn) {
-                MainScreen(
-                    volumeLevel = volumeLevel,
-                    onVolumeChange = onVolumeChange,
-                    onLogout = {
-                        UserSession.clear()
-                        currentScreen = Screen.Welcome
-                    }
-                )
-            } else {
-                // Non sei loggato? Torna alla schermata di welcome
-                LaunchedEffect(Unit) {
-                    currentScreen = Screen.Welcome
-                }
-            }
-        }
+        super.onBackPressed()
     }
 }
 
+// Enum per gestire i diversi schermi
 sealed class Screen {
+    object Loading : Screen()
     object Welcome : Screen()
     object Auth : Screen()
-    object Loading : Screen()
+    object Verification : Screen()
     object Main : Screen()
-    object VerifyOTP : Screen()
 }

@@ -7,7 +7,7 @@ import android.content.ServiceConnection
 import android.os.IBinder
 
 /**
- * Audio controller that can start the music and adjust volume
+ * Audio controller that can start/stop the music and adjust volume
  */
 class AudioController(private val context: Context) {
     private var audioService: BackgroundAudioService? = null
@@ -39,6 +39,18 @@ class AudioController(private val context: Context) {
         )
     }
 
+    fun stopBackgroundMusic() {
+        // Stop the music in the service
+        audioService?.stopMusic()
+
+        // Unbind from the service
+        unbind()
+
+        // Stop the service completely
+        val intent = Intent(context, BackgroundAudioService::class.java)
+        context.stopService(intent)
+    }
+
     fun setVolume(volume: Float) {
         audioService?.setVolume(volume)
     }
@@ -48,5 +60,26 @@ class AudioController(private val context: Context) {
             context.unbindService(serviceConnection)
             bound = false
         }
+    }
+
+    /**
+     * Check if the music is currently playing
+     */
+    fun isPlaying(): Boolean {
+        return audioService?.isPlaying() ?: false
+    }
+
+    /**
+     * Pause the music without stopping the service
+     */
+    fun pauseMusic() {
+        audioService?.pauseMusic()
+    }
+
+    /**
+     * Resume the music
+     */
+    fun resumeMusic() {
+        audioService?.resumeMusic()
     }
 }

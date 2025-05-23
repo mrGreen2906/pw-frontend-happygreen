@@ -1,22 +1,41 @@
 package com.example.frontend_happygreen.screens
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Handler
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -27,40 +46,108 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material.icons.rounded.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AllInclusive
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Business
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Directions
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.FilterAlt
+import androidx.compose.material.icons.filled.FilterListOff
+import androidx.compose.material.icons.filled.FindReplace
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.LocalGroceryStore
+import androidx.compose.material.icons.filled.LocationOff
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Store
+import androidx.compose.material.icons.outlined.FilterList
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.List
+import androidx.compose.material.icons.outlined.NavigateNext
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.LocationOn
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Divider
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.SuggestionChipDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.frontend_happygreen.ui.components.SectionHeader
 import com.example.frontend_happygreen.ui.theme.Green100
 import com.example.frontend_happygreen.ui.theme.Green600
 import com.example.frontend_happygreen.ui.theme.Green800
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.Granularity
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
@@ -70,10 +157,6 @@ import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 import java.net.HttpURLConnection
 import java.net.URL
-import org.json.JSONObject
-import android.content.Context
-import androidx.compose.foundation.BorderStroke
-import com.example.frontend_happygreen.ui.components.SectionHeader
 
 // Data classes e helper classes rimangono invariati
 enum class WastePointType(val displayName: String, val icon: ImageVector) {
@@ -495,6 +578,9 @@ fun EcoCentersMapScreen(
     val materialFilter by viewModel.materialFilter
     val selectedTypeFilter by viewModel.selectedTypeFilter
 
+    var locationError by remember { mutableStateOf<String?>(null) }
+    var isLoadingLocation by remember { mutableStateOf(false) }
+
     // Stati locali per l'UI
     var mapInitialized by remember { mutableStateOf(false) }
     var toolbarExpanded by remember { mutableStateOf(false) }
@@ -528,23 +614,36 @@ fun EcoCentersMapScreen(
     ) { isGranted ->
         locationPermissionGranted = isGranted
         if (isGranted) {
-            getUserLocation(context) { latitude, longitude ->
+            locationError = null
+            isLoadingLocation = true
+            getUserLocationWithTimeout(context) { latitude, longitude ->
+                isLoadingLocation = false
+                locationError = null
                 viewModel.setUserLocation(latitude, longitude)
             }
+        } else {
+            isLoadingLocation = false
+            locationError = "Permesso di geolocalizzazione negato"
         }
     }
+
 
     LaunchedEffect(Unit) {
         Configuration.getInstance().userAgentValue = context.packageName
     }
 
     LaunchedEffect(locationPermissionGranted) {
-        if (locationPermissionGranted && userLocation == null) {
-            getUserLocation(context) { latitude, longitude ->
+        if (locationPermissionGranted && userLocation == null && locationError == null) {
+            isLoadingLocation = true
+            locationError = null
+            getUserLocationWithTimeout(context) { latitude, longitude ->
+                isLoadingLocation = false
+                locationError = null
                 viewModel.setUserLocation(latitude, longitude)
             }
         }
     }
+
 
     // Gestione degli effetti del punto selezionato
     LaunchedEffect(selectedPoint) {
@@ -559,12 +658,33 @@ fun EcoCentersMapScreen(
     }
 
     // Contenuto principale
-    Box(modifier = Modifier.fillMaxSize()) {
-        if (!locationPermissionGranted) {
-            PermissionRequestScreen2 { requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION) }
-        } else if (userLocation == null) {
-            LoadingScreenMap()
-        } else {
+    when {
+        !locationPermissionGranted -> {
+            PermissionRequestScreen2 {
+                requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            }
+        }
+
+        locationError != null -> {
+            LocationErrorScreen(
+                error = locationError!!,
+                onRetry = {
+                    locationError = null
+                    isLoadingLocation = true
+                    getUserLocationWithTimeout(context) { latitude, longitude ->
+                        isLoadingLocation = false
+                        viewModel.setUserLocation(latitude, longitude)
+                    }
+                },
+                onBack = onBack
+            )
+        }
+
+        isLoadingLocation || (userLocation == null && locationError == null) -> {
+            LoadingLocationScreen(onBack = onBack)
+        }
+
+        else -> {
             // UI principale con mappa
             Box(modifier = Modifier.fillMaxSize()) {
                 // Mappa come sfondo sempre presente
@@ -2572,5 +2692,330 @@ fun LoadingScreenMap() {
                 color = Green600
             )
         }
+    }
+}
+
+@Composable
+fun LocationErrorScreen(
+    error: String,
+    onRetry: () -> Unit,
+    onBack: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color.Red.copy(alpha = 0.1f),
+                        Color.White
+                    )
+                )
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .padding(16.dp),
+            shape = RoundedCornerShape(20.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Icona di errore
+                Box(
+                    modifier = Modifier
+                        .size(100.dp)
+                        .clip(CircleShape)
+                        .background(Color.Red.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.LocationOff,
+                        contentDescription = null,
+                        tint = Color.Red,
+                        modifier = Modifier.size(60.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Text(
+                    text = "Problema con la geolocalizzazione",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    color = Color.Red
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = error,
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center,
+                    color = Color.Gray
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Suggerimenti
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Suggerimenti:",
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        val suggestions = listOf(
+                            "Assicurati che il GPS sia attivo",
+                            "Controlla che l'app abbia i permessi di localizzazione",
+                            "Prova a spostarti all'aperto per un segnale migliore",
+                            "Riavvia l'app se il problema persiste"
+                        )
+
+                        suggestions.forEach { suggestion ->
+                            Row(
+                                modifier = Modifier.padding(vertical = 2.dp),
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Text("• ", color = MaterialTheme.colorScheme.onSecondaryContainer)
+                                Text(
+                                    suggestion,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                // Pulsanti
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onBack,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Indietro")
+                    }
+
+                    Button(
+                        onClick = onRetry,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Green600)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("RIPROVA")
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * AGGIUNTO: Schermata di caricamento con timeout per la posizione
+ */
+@Composable
+fun LoadingLocationScreen(onBack: () -> Unit) {
+    val infiniteTransition = rememberInfiniteTransition()
+    val rotation = infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        )
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFF5F5F5)),
+        contentAlignment = Alignment.Center
+    ) {
+        // Pulsante indietro in alto a sinistra
+        IconButton(
+            onClick = onBack,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(top = 48.dp, start = 16.dp)
+                .background(Color.White, CircleShape)
+                .size(48.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.ArrowBack,
+                contentDescription = "Indietro"
+            )
+        }
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                // Cerchio di caricamento
+                CircularProgressIndicator(
+                    color = Green600,
+                    strokeWidth = 4.dp,
+                    modifier = Modifier.size(80.dp)
+                )
+
+                // Icona GPS rotante
+                Icon(
+                    imageVector = Icons.Default.LocationOn,
+                    contentDescription = null,
+                    tint = Green600,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .rotate(rotation.value)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            Text(
+                text = "Rilevamento posizione...",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Medium,
+                color = Green800
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "Sto cercando la tua posizione per trovare i punti di raccolta vicini",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.Gray,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 32.dp)
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Indicatore di progress
+            LinearProgressIndicator(
+                color = Green600,
+                trackColor = Green100,
+                modifier = Modifier
+                    .width(200.dp)
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+            )
+        }
+    }
+}
+
+/**
+ * MODIFICATO: Funzione per ottenere la posizione con timeout
+ */
+private fun getUserLocationWithTimeout(
+    context: Context,
+    onLocationReceived: (latitude: Double, longitude: Double) -> Unit
+) {
+    try {
+        val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+
+        if (ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            // Prima prova con l'ultima posizione nota
+            fusedLocationClient.lastLocation
+                .addOnSuccessListener { location ->
+                    if (location != null) {
+                        onLocationReceived(location.latitude, location.longitude)
+                    } else {
+                        // Se non c'è una posizione salvata, richiedi aggiornamenti
+                        requestLocationUpdatesWithTimeout(context, fusedLocationClient, onLocationReceived)
+                    }
+                }
+                .addOnFailureListener {
+                    // Se fallisce, prova con gli aggiornamenti
+                    requestLocationUpdatesWithTimeout(context, fusedLocationClient, onLocationReceived)
+                }
+        }
+    } catch (e: Exception) {
+        Log.e("LocationUtil", "Error getting location", e)
+        // In caso di errore, prova a ottenere comunque la posizione
+        requestLocationUpdatesWithTimeout(context, LocationServices.getFusedLocationProviderClient(context), onLocationReceived)
+    }
+}
+
+/**
+ * MODIFICATO: Richiesta aggiornamenti posizione con timeout
+ */
+private fun requestLocationUpdatesWithTimeout(
+    context: Context,
+    fusedLocationClient: FusedLocationProviderClient,
+    onLocationReceived: (latitude: Double, longitude: Double) -> Unit,
+    onTimeout: (() -> Unit)? = null // opzionale: callback in caso di timeout
+) {
+    try {
+        val locationRequest = LocationRequest.Builder(
+            Priority.PRIORITY_HIGH_ACCURACY, // Priorità
+            0L // Intervallo (millisecondi)
+        ).apply {
+            setMaxUpdates(1)
+            setGranularity(Granularity.GRANULARITY_FINE)
+        }.build()
+
+
+
+        val locationCallback = object : LocationCallback() {
+            override fun onLocationResult(locationResult: LocationResult) {
+                val location = locationResult.lastLocation
+                if (location != null) {
+                    onLocationReceived(location.latitude, location.longitude)
+                }
+                fusedLocationClient.removeLocationUpdates(this)
+            }
+        }
+
+        if (ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            fusedLocationClient.requestLocationUpdates(
+                locationRequest,
+                locationCallback,
+                context.mainLooper
+            )
+
+            // Timeout manuale dopo 15 secondi
+            Handler(context.mainLooper).postDelayed({
+                fusedLocationClient.removeLocationUpdates(locationCallback)
+                onTimeout?.invoke() // opzionale: notifica del timeout
+            }, 15000)
+        } else {
+            Log.e("LocationUtil", "Permesso di localizzazione non concesso")
+        }
+    } catch (e: Exception) {
+        Log.e("LocationUtil", "Errore durante la richiesta della posizione", e)
     }
 }

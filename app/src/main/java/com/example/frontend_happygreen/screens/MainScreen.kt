@@ -1,4 +1,7 @@
+// MainScreen.kt aggiornato con classifica integrata ed eco-centers
+
 package com.example.frontend_happygreen.screens
+
 import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -16,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -24,9 +28,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChatBubble
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CropFree
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Forest
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.GroupAdd
 import androidx.compose.material.icons.filled.Home
@@ -79,6 +86,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -102,11 +110,15 @@ import com.example.frontend_happygreen.data.UserSession
 import com.example.frontend_happygreen.games.EcoDetectiveGameScreen
 import com.example.frontend_happygreen.games.EcoGameScreen
 import com.example.frontend_happygreen.ui.components.CenteredLoader
+import com.example.frontend_happygreen.ui.components.SectionHeader
+import com.example.frontend_happygreen.ui.theme.Blue500
 import com.example.frontend_happygreen.ui.theme.Green100
 import com.example.frontend_happygreen.ui.theme.Green300
 import com.example.frontend_happygreen.ui.theme.Green600
 import com.example.frontend_happygreen.ui.theme.Green800
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class MainScreenViewModel : ViewModel() {
@@ -130,6 +142,9 @@ class MainScreenViewModel : ViewModel() {
     var hasNotifications = mutableStateOf(false)
     var notificationCount = mutableStateOf(0)
 
+    // Post dell'utente
+    private val _userPosts = MutableStateFlow<List<Post>>(emptyList())
+
     // Per i punteggi
     var leaderboardData = mutableStateOf<List<LeaderboardItems>>(emptyList())
     var isLoadingLeaderboard = mutableStateOf(false)
@@ -149,6 +164,7 @@ class MainScreenViewModel : ViewModel() {
             }
         }
     }
+
     fun refreshData() {
         viewModelScope.launch {
             loadUserData()
@@ -156,6 +172,7 @@ class MainScreenViewModel : ViewModel() {
             loadLeaderboard()
         }
     }
+
 
     data class LeaderboardItems(
         val id: Int,
@@ -197,6 +214,7 @@ class MainScreenViewModel : ViewModel() {
                             isCurrentUser = item.userId == currentUserId
                         )
                     }
+
                     leaderboardInitialized = true
                 } else {
                     errorMessage.value = "Errore nel caricamento della classifica: ${response.code()}"
@@ -356,6 +374,7 @@ class MainScreenViewModel : ViewModel() {
             }
         }
     }
+
     @Composable
     fun LeaderboardItem(
         rank: Int,
@@ -382,6 +401,7 @@ class MainScreenViewModel : ViewModel() {
                 modifier = Modifier.width(40.dp)
             )
 
+            // Avatar
             Box(
                 modifier = Modifier
                     .size(48.dp)
@@ -498,8 +518,12 @@ class MainScreenViewModel : ViewModel() {
     private fun loadInitialData() {
         viewModelScope.launch {
             try {
+                // CORRETTO: Carica solo i gruppi dell'utente autenticato
                 loadUserGroups()
+
+                // Carica giochi (dato statico per ora)
                 loadGames()
+
                 isLoading.value = false
             } catch (e: Exception) {
                 errorMessage.value = "Errore nel caricamento dei dati: ${e.message}"
@@ -594,6 +618,9 @@ class MainScreenViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Unisciti a un gruppo esistente
+     */
     fun joinGroup(groupId: Int, onSuccess: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
             try {
@@ -923,7 +950,7 @@ fun MainScreen(
             }
         }
         showEcoDetectiveGame -> EcoDetectiveGameScreen(onBack = { showEcoDetectiveGame = false })
-        showEcoSfidaGame -> EcoGameScreen(onBack = { showEcoSfidaGame = false })
+        showEcoSfidaGame -> EcoGameScreen()
         showBarcodeScanner -> BarcodeScannerScreen(onBack = { showBarcodeScanner = false })
         else -> MainAppScaffold(
             currentTab = currentTab,

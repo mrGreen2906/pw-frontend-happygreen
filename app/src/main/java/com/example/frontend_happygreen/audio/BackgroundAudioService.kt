@@ -17,41 +17,107 @@ class BackgroundAudioService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        // Create MediaPlayer and set the audio resource
-        mediaPlayer = MediaPlayer.create(this, R.raw.background_music)
-        mediaPlayer?.apply {
-            isLooping = true  // Loop the audio continuously
-            setVolume(0.5f, 0.5f)  // Default volume
-        }
+        setupMediaPlayer()
+    }
 
-        // Start playing automatically
-        playAudio()
+    private fun setupMediaPlayer() {
+        try {
+            mediaPlayer = MediaPlayer.create(this, R.raw.background_music)
+            mediaPlayer?.apply {
+                isLooping = true
+                setVolume(0.5f, 0.5f) // Default volume at 50%
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Always start playing
-        playAudio()
-
-        // If service is killed, restart it
-        return START_STICKY
+        startMusic()
+        return START_STICKY // Restart if killed
     }
 
-    private fun playAudio() {
-        if (mediaPlayer?.isPlaying == false) {
-            mediaPlayer?.start()
+    override fun onBind(intent: Intent?): IBinder {
+        return binder
+    }
+
+    private fun startMusic() {
+        try {
+            mediaPlayer?.let { player ->
+                if (!player.isPlaying) {
+                    player.start()
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
-    // Set volume method that can be called from the activity
-    fun setVolume(volume: Float) {
-        mediaPlayer?.setVolume(volume, volume)
+    fun stopMusic() {
+        try {
+            mediaPlayer?.let { player ->
+                if (player.isPlaying) {
+                    player.stop()
+                    player.prepareAsync() // Prepare for future playback
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
-    override fun onBind(intent: Intent?): IBinder = binder
+    fun pauseMusic() {
+        try {
+            mediaPlayer?.let { player ->
+                if (player.isPlaying) {
+                    player.pause()
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun resumeMusic() {
+        try {
+            mediaPlayer?.let { player ->
+                if (!player.isPlaying) {
+                    player.start()
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun setVolume(volume: Float) {
+        try {
+            mediaPlayer?.setVolume(volume, volume)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun isPlaying(): Boolean {
+        return try {
+            mediaPlayer?.isPlaying ?: false
+        } catch (e: Exception) {
+            false
+        }
+    }
 
     override fun onDestroy() {
-        mediaPlayer?.release()
-        mediaPlayer = null
         super.onDestroy()
+        try {
+            mediaPlayer?.let { player ->
+                if (player.isPlaying) {
+                    player.stop()
+                }
+                player.release()
+            }
+            mediaPlayer = null
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 }
