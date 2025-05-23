@@ -5,11 +5,13 @@ import androidx.compose.animation.AnimatedVisibility as ComposeAnimatedVisibilit
 import androidx.compose.animation.core.*
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -19,12 +21,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -39,14 +45,16 @@ import com.example.frontend_happygreen.api.RetrofitClient
 import com.example.frontend_happygreen.api.UpdatePointsRequest
 import kotlinx.coroutines.MainScope
 
+
+
 /**
- * Enumerazione per i tipi di rifiuto
+ * Enumerazione per i tipi di rifiuto con colori aggiornati
  */
-enum class WasteType(val colorCode: Color, val displayName: String) {
-    PAPER(Blue500, "Carta"),
-    PLASTIC(Color.Yellow, "Plastica"),
-    ORGANIC(Green500, "Organico"),
-    GLASS(Orange500, "Vetro")
+enum class WasteType(val colorCode: Color, val displayName: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    PAPER(EcoBlue, "Carta", Icons.Default.Description),
+    PLASTIC(EcoWarning, "Plastica", Icons.Default.LocalDrink),
+    ORGANIC(EcoGreen, "Organico", Icons.Default.Eco),
+    GLASS(EcoLightBlue, "Vetro", Icons.Default.LocalBar)
 }
 
 /**
@@ -57,70 +65,79 @@ data class WasteItem(
     val name: String,
     val imageRes: Int,
     val type: WasteType,
-    val description: String
+    val description: String,
+    val educationalFact: String
 )
 
 /**
  * ViewModel per gestire la logica del gioco
  */
 class EcoDetectiveViewModel : ViewModel() {
-    // Database degli oggetti rifiuto
+    // Database degli oggetti rifiuto espanso con fatti educativi
     private val allWasteItems = listOf(
         WasteItem(
             id = 1,
             name = "Bottiglia di plastica",
             imageRes = R.drawable.happy_green_logo,
             type = WasteType.PLASTIC,
-            description = "Le bottiglie di plastica impiegano fino a 450 anni per decomporsi"
+            description = "Le bottiglie di plastica impiegano fino a 450 anni per decomporsi",
+            educationalFact = "Una bottiglia di plastica PET produce 82g di CO2 durante la produzione"
         ),
         WasteItem(
             id = 2,
             name = "Giornale",
             imageRes = R.drawable.happy_green_logo,
             type = WasteType.PAPER,
-            description = "La carta si decompone in circa 2-5 mesi se correttamente smaltita"
+            description = "La carta si decompone in circa 2-5 mesi se correttamente smaltita",
+            educationalFact = "Riciclare una tonnellata di carta salva 17 alberi"
         ),
         WasteItem(
             id = 3,
             name = "Buccia di banana",
             imageRes = R.drawable.happy_green_logo,
             type = WasteType.ORGANIC,
-            description = "Gli scarti organici si decompongono in poche settimane in compost"
+            description = "Gli scarti organici si decompongono in poche settimane in compost",
+            educationalFact = "Il compost domestico riduce i rifiuti del 30%"
         ),
         WasteItem(
             id = 4,
             name = "Bottiglia di vetro",
             imageRes = R.drawable.happy_green_logo,
             type = WasteType.GLASS,
-            description = "Il vetro può impiegare oltre 4000 anni per decomporsi naturalmente"
+            description = "Il vetro può impiegare oltre 4000 anni per decomporsi naturalmente",
+            educationalFact = "Il vetro è riciclabile infinite volte senza perdere qualità"
         ),
         WasteItem(
             id = 5,
             name = "Sacchetto di plastica",
             imageRes = R.drawable.happy_green_logo,
             type = WasteType.PLASTIC,
-            description = "I sacchetti di plastica impiegano fino a 20 anni per decomporsi"
+            description = "I sacchetti di plastica impiegano fino a 20 anni per decomporsi",
+            educationalFact = "Ogni anno finiscono negli oceani 8 milioni di tonnellate di plastica"
         ),
         WasteItem(
             id = 6,
             name = "Cartone del latte",
             imageRes = R.drawable.happy_green_logo,
             type = WasteType.PAPER,
-            description = "I contenitori Tetra Pak sono riciclabili nella carta"
+            description = "I contenitori Tetra Pak sono riciclabili nella carta",
+            educationalFact = "I Tetra Pak sono composti per il 75% da carta riciclabile"
         ),
         WasteItem(
             id = 7,
             name = "Avanzi di cibo",
             imageRes = R.drawable.happy_green_logo,
             type = WasteType.ORGANIC,
-            description = "Gli avanzi di cibo possono diventare compost per le piante"
+            description = "Gli avanzi di cibo possono diventare compost per le piante",
+            educationalFact = "Il 30% del cibo prodotto nel mondo viene sprecato"
         ),
         WasteItem(
             id = 8,
             name = "Barattolo di vetro",
             imageRes = R.drawable.happy_green_logo,
             type = WasteType.GLASS,
-            description = "Il vetro è riciclabile infinite volte senza perdere qualità"
+            description = "Il vetro è riciclabile infinite volte senza perdere qualità",
+            educationalFact = "Riciclare vetro consuma il 40% meno energia della produzione da materie prime"
         )
     )
 
@@ -132,6 +149,10 @@ class EcoDetectiveViewModel : ViewModel() {
     var currentWasteItem by mutableStateOf(allWasteItems.random())
     var feedbackMessage by mutableStateOf<FeedbackMessage?>(null)
     var showFeedback by mutableStateOf(false)
+    var comboStreak by mutableStateOf(0)
+    var perfectStreak by mutableStateOf(0)
+    var showConfetti by mutableStateOf(false)
+    var currentLevel by mutableStateOf(1)
 
     // Timer del gioco
     fun startTimer(onGameOver: () -> Unit) {
@@ -148,29 +169,56 @@ class EcoDetectiveViewModel : ViewModel() {
         }
     }
 
-    // Verifica la selezione del bidone
+    // Verifica la selezione del bidone con sistema di punteggio migliorato
     fun checkSelection(selectedType: WasteType): Boolean {
-        // Controlla se è il bidone corretto
         val isCorrect = (selectedType == currentWasteItem.type)
 
         if (isCorrect) {
-            // Risposta corretta
-            score += 10
+            comboStreak += 1
+            perfectStreak += 1
+
+            // Sistema di punteggio progressivo
+            val basePoints = when {
+                comboStreak >= 10 -> 25
+                comboStreak >= 5 -> 20
+                comboStreak >= 3 -> 15
+                else -> 10
+            }
+
+            val timeBonus = if (timeLeft > 50) 5 else 0
+            val totalPoints = basePoints + timeBonus
+            score += totalPoints
+
+            // Aggiorna livello
+            currentLevel = (score / 100) + 1
+
             feedbackMessage = FeedbackMessage(
-                "Corretto! +10 punti",
+                "Corretto! +$totalPoints punti",
                 "Hai smaltito correttamente ${currentWasteItem.name}",
+                currentWasteItem.educationalFact,
                 isError = false
             )
+
+            // Attiva confetti per combo lunghi
+            if (comboStreak >= 5) {
+                showConfetti = true
+                viewModelScope.launch {
+                    delay(2000)
+                    showConfetti = false
+                }
+            }
         } else {
-            // Risposta sbagliata
             lives -= 1
+            comboStreak = 0
+            perfectStreak = 0
+
             feedbackMessage = FeedbackMessage(
                 "Sbagliato! -1 vita",
                 "${currentWasteItem.name} va nella raccolta ${currentWasteItem.type.displayName}",
+                currentWasteItem.educationalFact,
                 isError = true
             )
 
-            // Controlla se il gioco è finito
             if (lives <= 0) {
                 gameState = GameState.GameOver
             }
@@ -196,46 +244,54 @@ class EcoDetectiveViewModel : ViewModel() {
         showFeedback = false
         feedbackMessage = null
         currentWasteItem = allWasteItems.random()
+        comboStreak = 0
+        perfectStreak = 0
+        showConfetti = false
+        currentLevel = 1
     }
 
-    // Aggiungiamo una funzione nel ViewModel per inviare i punti al server
-// Modifica la funzione sendScoreToServer in EcoDetectiveViewModel
-    fun sendScoreToServer(onSuccess: (Int) -> Unit) {
+    fun sendScoreToServer(onSuccess: (Int) -> Unit, onError: (String) -> Unit = {}) {
         val gameId = "eco_detective"
         val scoreToSend = score
         val apiService = RetrofitClient.create(ApiService::class.java)
+
         viewModelScope.launch {
             try {
-                val token = UserSession.getAuthHeader() ?: return@launch
+                val token = UserSession.getAuthHeader() ?: run {
+                    onError("Non sei autenticato")
+                    return@launch
+                }
 
                 val response = apiService.updateUserPoints(
                     token,
                     UpdatePointsRequest(
                         points = scoreToSend,
-                        game_id = gameId  // Nota che qui ho cambiato 'gameid' a 'game_id'
+                        game_id = gameId
                     )
                 )
 
                 if (response.isSuccessful && response.body() != null) {
-                    // Aggiorna i punti dell'utente localmente
-                    val totalPoints = response.body()!!.total_points  // Cambiato da totalPoints a total_points
+                    val totalPoints = response.body()!!.total_points
                     UserSession.setEcoPoints(totalPoints)
                     onSuccess(totalPoints)
+                } else {
+                    onError("Errore nell'invio del punteggio: ${response.message()}")
                 }
             } catch (e: Exception) {
-                // Gestisci l'errore (potrebbe essere necessario aggiungere un callback di errore)
                 Log.e("EcoDetectiveViewModel", "Error sending score: ${e.message}")
+                onError("Errore di connessione: ${e.message}")
             }
         }
     }
 }
 
 /**
- * Classe dati per i messaggi di feedback
+ * Classe dati per i messaggi di feedback aggiornata
  */
 data class FeedbackMessage(
     val title: String,
     val description: String,
+    val educationalFact: String,
     val isError: Boolean
 )
 
@@ -248,7 +304,7 @@ enum class GameState {
 }
 
 /**
- * Schermata principale del gioco EcoDetective
+ * Schermata principale del gioco EcoDetective con grafica aggiornata
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -256,107 +312,74 @@ fun EcoDetectiveGameScreen(
     onBack: () -> Unit,
     viewModel: EcoDetectiveViewModel = viewModel()
 ) {
-    val scope = rememberCoroutineScope()
-
     // Avvia il timer del gioco
     LaunchedEffect(Unit) {
-        viewModel.startTimer {
-        }
+        viewModel.startTimer {}
     }
 
     // Gestione del feedback
     LaunchedEffect(viewModel.showFeedback) {
         if (viewModel.showFeedback) {
-            delay(2000)
-            // Se il gioco è ancora in corso, passa al prossimo item
+            delay(3000)
             if (viewModel.gameState == GameState.Playing) {
                 viewModel.nextItem()
             }
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Eco Detective") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Indietro")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Green600,
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White
-                )
-            )
-        }
-    ) { paddingValues ->
-        Box(
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Sfondo gradiente come EcoSfida
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .background(Color.White)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(EcoBackground, Color.White)
+                    )
+                )
         ) {
             if (viewModel.gameState == GameState.GameOver) {
-                // Schermata di Game Over
-                EcoSfidaGameOverScreen(
+                EnhancedGameOverScreen(
                     score = viewModel.score,
                     onRestart = { viewModel.resetGame() },
-                    onBack = onBack
+                    onBack = onBack,
+                    viewModel = viewModel
                 )
             } else {
-                // Schermata di gioco
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp)
-                ) {
-                    // Header con punteggio, vite e tempo
-                    GameHeader(
+                Column(modifier = Modifier.fillMaxSize()) {
+                    // Header migliorato
+                    EnhancedGameHeader(
                         score = viewModel.score,
                         lives = viewModel.lives,
-                        timeLeft = viewModel.timeLeft
+                        timeLeft = viewModel.timeLeft,
+                        comboStreak = viewModel.comboStreak,
+                        currentLevel = viewModel.currentLevel,
+                        perfectStreak = viewModel.perfectStreak
                     )
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                    // Item da smistare
-                    WasteItemCard(
+                    // Item da smistare con stile migliorato
+                    EnhancedWasteItemCard(
                         wasteItem = viewModel.currentWasteItem,
                         showFeedback = viewModel.showFeedback,
                         modifier = Modifier.weight(1f)
                     )
 
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Messaggio di feedback
-                    ComposeAnimatedVisibility(
-                        visible = viewModel.showFeedback,
-                        enter = fadeIn(),
-                        exit = fadeOut()
-                    ) {
+                    // Messaggio di feedback migliorato
+                    if (viewModel.showFeedback) {
                         viewModel.feedbackMessage?.let { message ->
-                            FeedbackMessageCard(message)
+                            EnhancedFeedbackMessageCard(message)
                         }
+                    } else {
+                        // Istruzioni stilizzate
+                        EnhancedInstructionCard()
                     }
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                    // Istruzioni
-                    if (!viewModel.showFeedback) {
-                        Text(
-                            text = "Seleziona il bidone corretto per questo rifiuto:",
-                            style = MaterialTheme.typography.bodyLarge,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
-
-                    // Bidoni di riciclaggio
-                    RecycleBinSelector(
+                    // Bidoni di riciclaggio migliorati
+                    EnhancedRecycleBinSelector(
                         onBinSelected = { binType ->
                             if (!viewModel.showFeedback) {
                                 viewModel.checkSelection(binType)
@@ -364,95 +387,228 @@ fun EcoDetectiveGameScreen(
                         },
                         enabled = !viewModel.showFeedback
                     )
+
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
             }
         }
+
+        // Effetti speciali
+        if (viewModel.showConfetti) {
+            ConfettiAnimation()
+        }
+
+        // Pulsante indietro stilizzato
+        IconButton(
+            onClick = onBack,
+            modifier = Modifier
+                .padding(16.dp)
+                .background(
+                    EcoGreen.copy(alpha = 0.9f),
+                    CircleShape
+                )
+                .size(48.dp)
+        ) {
+            Icon(
+                Icons.Default.ArrowBack,
+                contentDescription = "Indietro",
+                tint = Color.White
+            )
+        }
     }
 }
 
 /**
- * Header del gioco con punteggio, vite e tempo
+ * Header del gioco migliorato stile EcoSfida
  */
 @Composable
-fun GameHeader(
+fun EnhancedGameHeader(
     score: Int,
     lives: Int,
-    timeLeft: Int
+    timeLeft: Int,
+    comboStreak: Int,
+    currentLevel: Int,
+    perfectStreak: Int
 ) {
-    Row(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .background(
-                color = Green100,
-                shape = RoundedCornerShape(12.dp)
-            )
-            .padding(12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+            .shadow(8.dp),
+        colors = CardDefaults.cardColors(containerColor = EcoGreen),
+        shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)
     ) {
-        // Punteggio
         Column(
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier.padding(16.dp)
         ) {
-            Text(
-                text = score.toString(),
-                style = MaterialTheme.typography.titleLarge,
-                color = Green800,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "Punti",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Green600
-            )
-        }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Punteggio con icona
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Stars,
+                        contentDescription = null,
+                        tint = Color.Yellow,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "$score",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
+                }
 
-        // Vite rimanenti
-        Row(
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            repeat(3) { i ->
-                Icon(
-                    imageVector = Icons.Default.Favorite,
-                    contentDescription = null,
-                    tint = if (i < lives) Red500 else Color.Gray.copy(alpha = 0.3f),
-                    modifier = Modifier
-                        .size(24.dp)
-                        .padding(horizontal = 2.dp)
-                )
+                // Livello con badge
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = EcoDarkGreen
+                ) {
+                    Text(
+                        text = "LV.$currentLevel",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                    )
+                }
+
+                // Vite rimanenti
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    repeat(3) { i ->
+                        Icon(
+                            imageVector = Icons.Default.Favorite,
+                            contentDescription = null,
+                            tint = if (i < lives) Color.Red else Color.Gray.copy(alpha = 0.3f),
+                            modifier = Modifier
+                                .size(20.dp)
+                                .padding(horizontal = 1.dp)
+                        )
+                    }
+                }
             }
-        }
 
-        // Tempo rimanente
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = timeLeft.toString(),
-                style = MaterialTheme.typography.titleLarge,
-                color = if (timeLeft <= 10) Red500 else Green800,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "Secondi",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Green600
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Combo con animazione
+                if (comboStreak >= 3) {
+                    val infiniteTransition = rememberInfiniteTransition()
+                    val scale by infiniteTransition.animateFloat(
+                        initialValue = 1f,
+                        targetValue = 1.2f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(500),
+                            repeatMode = RepeatMode.Reverse
+                        )
+                    )
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.graphicsLayer(scaleX = scale, scaleY = scale)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Whatshot,
+                            contentDescription = null,
+                            tint = Color.Red,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Combo $comboStreak",
+                            color = Color.Yellow,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                    }
+                } else {
+                    Text(
+                        text = "Combo: $comboStreak",
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
+                }
+
+                // Perfect streak
+                if (perfectStreak >= 5) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.EmojiEvents,
+                            contentDescription = null,
+                            tint = Color.Yellow,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Perfect: $perfectStreak",
+                            color = Color.Yellow,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+
+                // Timer migliorato
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val timerColor = when {
+                        timeLeft <= 10 -> Color.Red
+                        timeLeft <= 20 -> EcoWarning
+                        else -> Color.White
+                    }
+
+                    Icon(
+                        imageVector = Icons.Default.Timer,
+                        contentDescription = null,
+                        tint = timerColor,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "$timeLeft",
+                        color = timerColor,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Barra del tempo
+            LinearProgressIndicator(
+                progress = timeLeft / 60f,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp)),
+                color = when {
+                    timeLeft <= 10 -> Color.Red
+                    timeLeft <= 20 -> EcoWarning
+                    else -> Color.Green
+                },
+                trackColor = Color.DarkGray
             )
         }
     }
 }
 
 /**
- * Card che mostra l'oggetto di rifiuto corrente
+ * Card dell'oggetto migliorata
  */
 @Composable
-fun WasteItemCard(
+fun EnhancedWasteItemCard(
     wasteItem: WasteItem,
     showFeedback: Boolean,
     modifier: Modifier = Modifier
 ) {
-    // Animazione di pulse per attirare l'attenzione
     val scale by animateFloatAsState(
-        targetValue = if (showFeedback) 1.0f else 1.05f,
+        targetValue = if (showFeedback) 1f else 1.05f,
         animationSpec = infiniteRepeatable(
             animation = tween(800),
             repeatMode = RepeatMode.Reverse
@@ -467,31 +623,44 @@ fun WasteItemCard(
             modifier = Modifier
                 .padding(16.dp)
                 .scale(if (showFeedback) 1f else scale),
-            elevation = CardDefaults.cardElevation(
-                defaultElevation = 4.dp
-            ),
-            shape = RoundedCornerShape(16.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+            shape = RoundedCornerShape(20.dp),
+            border = BorderStroke(2.dp, Green900)
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier.padding(24.dp)
             ) {
-                // Immagine dell'item
-                Box(
+                // Immagine con styling migliorato
+                Card(
                     modifier = Modifier
-                        .size(140.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color.White)
-                        .border(2.dp, wasteItem.type.colorCode, RoundedCornerShape(12.dp))
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
+                        .size(160.dp)
+                        .padding(8.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
                 ) {
-                    Image(
-                        painter = painterResource(id = wasteItem.imageRes),
-                        contentDescription = wasteItem.name,
-                        modifier = Modifier.size(100.dp),
-                        contentScale = ContentScale.Fit
-                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        Color.White,
+                                        wasteItem.type.colorCode.copy(alpha = 0.1f)
+                                    )
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painter = painterResource(id = wasteItem.imageRes),
+                            contentDescription = wasteItem.name,
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier
+                                .size(120.dp)
+                                .padding(8.dp)
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -499,40 +668,51 @@ fun WasteItemCard(
                 // Nome dell'item
                 Text(
                     text = wasteItem.name,
-                    style = MaterialTheme.typography.titleLarge,
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Descrizione dell'item
-                Text(
-                    text = wasteItem.description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.Gray,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 8.dp)
+                    color = EcoDarkGreen
                 )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Descrizione con stile migliorato
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = wasteItem.type.colorCode.copy(alpha = 0.1f)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = wasteItem.description,
+                        fontSize = 14.sp,
+                        color = Color.DarkGray,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(12.dp),
+                        lineHeight = 18.sp
+                    )
+                }
             }
         }
     }
 }
 
 /**
- * Componente per selezionare il bidone
+ * Bidoni selezionabili migliorati
  */
 @Composable
-fun RecycleBinSelector(
+fun EnhancedRecycleBinSelector(
     onBinSelected: (WasteType) -> Unit,
     enabled: Boolean
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
         WasteType.values().forEach { binType ->
-            RecycleBinItem(
+            EnhancedRecycleBinItem(
                 type = binType,
                 onClick = { onBinSelected(binType) },
                 enabled = enabled
@@ -542,37 +722,51 @@ fun RecycleBinSelector(
 }
 
 /**
- * Singolo bidone selezionabile
+ * Singolo bidone migliorato
  */
 @Composable
-fun RecycleBinItem(
+fun EnhancedRecycleBinItem(
     type: WasteType,
     onClick: () -> Unit,
     enabled: Boolean
 ) {
-    val alpha = if (enabled) 1f else 0.6f
+    val scale by animateFloatAsState(
+        targetValue = if (enabled) 1f else 0.8f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        )
+    )
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .padding(8.dp)
+            .padding(4.dp)
             .clickable(enabled = enabled) { onClick() }
+            .graphicsLayer(scaleX = scale, scaleY = scale)
     ) {
-        // Icona del bidone
-        Box(
-            modifier = Modifier
-                .size(70.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(type.colorCode.copy(alpha = alpha * 0.7f))
-                .border(2.dp, type.colorCode.copy(alpha = alpha), RoundedCornerShape(12.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.Delete,
-                contentDescription = type.displayName,
-                tint = Color.White.copy(alpha = alpha),
-                modifier = Modifier.size(36.dp)
+        // Icona del bidone migliorata
+        Card(
+            modifier = Modifier.size(80.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (enabled) type.colorCode else type.colorCode.copy(alpha = 0.5f)
+            ),
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(
+                defaultElevation = if (enabled) 8.dp else 2.dp
             )
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = type.icon,
+                    contentDescription = type.displayName,
+                    tint = Color.White,
+                    modifier = Modifier.size(40.dp)
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -580,211 +774,360 @@ fun RecycleBinItem(
         // Nome del tipo di rifiuto
         Text(
             text = type.displayName,
-            style = MaterialTheme.typography.bodyMedium,
+            fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
-            color = type.colorCode.copy(alpha = alpha)
+            color = if (enabled) type.colorCode else type.colorCode.copy(alpha = 0.5f)
         )
     }
 }
 
 /**
- * Card per i messaggi di feedback
+ * Card per istruzioni stilizzata
  */
 @Composable
-fun FeedbackMessageCard(message: FeedbackMessage) {
-    val backgroundColor = if (message.isError) Red100 else Green100
-    val textColor = if (message.isError) Red300  else Green800
-    val iconTint = if (message.isError) Red500 else Green600
-
+fun EnhancedInstructionCard() {
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = backgroundColor
-        ),
-        shape = RoundedCornerShape(12.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        colors = CardDefaults.cardColors(containerColor = EcoCardBackground),
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
         ) {
-            // Icona feedback
             Icon(
-                imageVector = if (message.isError)
-                    Icons.Default.Close else Icons.Default.Check,
+                imageVector = Icons.Default.TouchApp,
                 contentDescription = null,
-                tint = iconTint,
-                modifier = Modifier.size(32.dp)
+                tint = EcoGreen,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = "Tocca il bidone corretto per questo rifiuto!",
+                fontSize = 16.sp,
+                textAlign = TextAlign.Center,
+                color = EcoDarkGreen,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+/**
+ * Card feedback migliorata
+ */
+@Composable
+fun EnhancedFeedbackMessageCard(message: FeedbackMessage) {
+    val backgroundColor = if (message.isError) Color(0xFFFFEBEE) else Color(0xFFE8F5E8)
+    val accentColor = if (message.isError) EcoError else EcoSuccess
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        colors = CardDefaults.cardColors(containerColor = backgroundColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Icona risultato con animazione
+            val infiniteTransition = rememberInfiniteTransition()
+            val scale by infiniteTransition.animateFloat(
+                initialValue = 1f,
+                targetValue = if (!message.isError) 1.2f else 1.1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(800),
+                    repeatMode = RepeatMode.Reverse
+                )
             )
 
-            Spacer(modifier = Modifier.width(16.dp))
+            Icon(
+                imageVector = if (!message.isError) Icons.Default.CheckCircle else Icons.Default.Cancel,
+                contentDescription = null,
+                tint = accentColor,
+                modifier = Modifier
+                    .size(48.dp)
+                    .graphicsLayer(scaleX = scale, scaleY = scale)
+            )
 
-            Column {
-                // Titolo feedback
-                Text(
-                    text = message.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = textColor,
-                    fontWeight = FontWeight.Bold
-                )
+            Spacer(modifier = Modifier.height(12.dp))
 
-                Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = message.title,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = accentColor,
+                textAlign = TextAlign.Center
+            )
 
-                // Descrizione feedback
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Descrizione
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                shape = RoundedCornerShape(12.dp)
+            ) {
                 Text(
                     text = message.description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = textColor
+                    fontSize = 16.sp,
+                    color = Color.DarkGray,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(12.dp)
                 )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Fatto educativo
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = EcoLightGreen.copy(alpha = 0.3f)
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Lightbulb,
+                            contentDescription = null,
+                            tint = EcoWarning,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Lo sapevi?",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            color = EcoDarkGreen
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = message.educationalFact,
+                        fontSize = 14.sp,
+                        color = Color.DarkGray,
+                        lineHeight = 18.sp
+                    )
+                }
             }
         }
     }
 }
 
 /**
- * Schermata di Game Over
+ * Animazione confetti
+ */
+
+
+
+/**
+ * Schermata Game Over migliorata
  */
 @Composable
-fun EcoSfidaGameOverScreen(
+fun EnhancedGameOverScreen(
     score: Int,
     onRestart: () -> Unit,
     onBack: () -> Unit,
     viewModel: EcoDetectiveViewModel = viewModel()
 ) {
-    // Effetto confetti per punteggi alti
-    val showConfetti = score > 50
     var totalPoints by remember { mutableStateOf<Int?>(null) }
     var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    // Invia il punteggio al server quando viene mostrata la schermata di Game Over
     LaunchedEffect(Unit) {
-        viewModel.sendScoreToServer { points ->
-            totalPoints = points
-            isLoading = false
-        }
+        viewModel.sendScoreToServer(
+            onSuccess = { points ->
+                totalPoints = points
+                isLoading = false
+            },
+            onError = { error ->
+                errorMessage = error
+                isLoading = false
+            }
+        )
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(EcoBackground, Color.White)
+                )
+            )
     ) {
-        // Corona animata per punteggi alti
-        if (showConfetti) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(32.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Icona game over animata
+            val infiniteTransition = rememberInfiniteTransition()
+            val scale by infiniteTransition.animateFloat(
+                initialValue = 1f,
+                targetValue = 1.1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1000),
+                    repeatMode = RepeatMode.Reverse
+                )
+            )
+
             Icon(
-                imageVector = Icons.Default.EmojiEvents,
+                imageVector = if (score > 50) Icons.Default.EmojiEvents else Icons.Default.SentimentDissatisfied,
                 contentDescription = null,
-                tint = Color(0xFFFFC107),
+                tint = if (score > 50) Color(0xFFFFC107) else Color.Gray,
                 modifier = Modifier
                     .size(80.dp)
-                    .scale(
-                        animateFloatAsState(
-                            targetValue = 1.2f,
-                            animationSpec = infiniteRepeatable(
-                                animation = tween(800),
-                                repeatMode = RepeatMode.Reverse
-                            )
-                        ).value
-                    )
+                    .graphicsLayer(scaleX = scale, scaleY = scale)
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Text(
+                text = "Game Over",
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold,
+                color = EcoGreen
             )
 
             Spacer(modifier = Modifier.height(16.dp))
-        }
 
-        Text(
-            text = "Game Over",
-            style = MaterialTheme.typography.displaySmall,
-            fontWeight = FontWeight.Bold,
-            color = Green800
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Text(
-            text = "Punteggio Finale",
-            style = MaterialTheme.typography.titleLarge,
-            color = Gray600
-        )
-
-        Text(
-            text = "$score",
-            style = MaterialTheme.typography.displayLarge,
-            fontWeight = FontWeight.Bold,
-            color = Green600
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Mostra lo stato del caricamento o i punti totali
-        if (isLoading) {
-            CircularProgressIndicator(color = Green600)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("Aggiornamento punti in corso...", color = Gray600)
-        } else {
-            // Card con i punti totali
+            // Punteggio finale
             Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Green100),
-                shape = RoundedCornerShape(12.dp)
+                colors = CardDefaults.cardColors(
+                    containerColor = EcoLightGreen.copy(alpha = 0.3f)
+                ),
+                shape = RoundedCornerShape(20.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
             ) {
                 Column(
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier.padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "Eco Points Totali",
+                        text = "Punteggio Finale",
                         style = MaterialTheme.typography.titleMedium,
-                        color = Green800
+                        color = EcoDarkGreen
                     )
 
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     Text(
-                        text = "$totalPoints",
-                        style = MaterialTheme.typography.headlineMedium,
+                        text = "$score",
+                        style = MaterialTheme.typography.displayLarge,
                         fontWeight = FontWeight.Bold,
-                        color = Green600
+                        color = EcoGreen
                     )
                 }
             }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Punti totali
+            if (isLoading) {
+                CircularProgressIndicator(color = EcoGreen)
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Aggiornamento punti...", color = Color.Gray)
+            } else if (errorMessage != null) {
+                Text(
+                    text = errorMessage!!,
+                    color = EcoError,
+                    textAlign = TextAlign.Center
+                )
+            } else {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = EcoLightGreen),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.EmojiNature,
+                            contentDescription = null,
+                            tint = EcoGreen,
+                            modifier = Modifier.size(32.dp)
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = "Eco Points Totali",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = EcoDarkGreen,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Text(
+                            text = "$totalPoints",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = EcoGreen
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Pulsanti stilizzati
+            Button(
+                onClick = onRestart,
+                colors = ButtonDefaults.buttonColors(containerColor = EcoGreen),
+                shape = RoundedCornerShape(24.dp),
+                modifier = Modifier.fillMaxWidth(),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Gioca ancora",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = onBack,
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Gray),
+                shape = RoundedCornerShape(24.dp),
+                modifier = Modifier.fillMaxWidth(),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Home,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Torna alla Home",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
         }
-
-        // Messaggio basato sul punteggio
-        val message = when {
-            score >= 100 -> "Eccellente! Sei un vero Eco Detective!"
-            score >= 50 -> "Ottimo lavoro! Stai diventando un esperto del riciclo."
-            score >= 20 -> "Buon risultato! Continua a migliorare."
-            else -> "Continua ad allenarti per diventare un Eco Detective."
-        }
-
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center,
-            color = Gray700
-        )
-
-        Spacer(modifier = Modifier.height(48.dp))
-
-        // Pulsanti
-        HappyGreenButton(
-            text = "Gioca ancora",
-            onClick = onRestart,
-            icon = Icons.Default.Refresh,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp)
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        HappyGreenButton(
-            text = "Torna alla Home",
-            onClick = onBack,
-            icon = Icons.Default.Home,
-            isOutlined = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp)
-        )
     }
 }
