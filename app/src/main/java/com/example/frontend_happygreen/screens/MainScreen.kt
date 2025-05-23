@@ -923,7 +923,7 @@ fun MainScreen(
             }
         }
         showEcoDetectiveGame -> EcoDetectiveGameScreen(onBack = { showEcoDetectiveGame = false })
-        showEcoSfidaGame -> EcoGameScreen()
+        showEcoSfidaGame -> EcoGameScreen(onBack = { showEcoSfidaGame = false })
         showBarcodeScanner -> BarcodeScannerScreen(onBack = { showBarcodeScanner = false })
         else -> MainAppScaffold(
             currentTab = currentTab,
