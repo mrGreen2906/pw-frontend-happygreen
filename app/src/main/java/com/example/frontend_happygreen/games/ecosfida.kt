@@ -1,23 +1,66 @@
 package com.example.frontend_happygreen.games
 
-import android.os.Bundle
 import android.util.Log
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.EmojiNature
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.SentimentDissatisfied
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Stars
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.TouchApp
+import androidx.compose.material.icons.filled.Whatshot
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,8 +69,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -35,7 +76,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.frontend_happygreen.R
+import coil.compose.AsyncImage
 import com.example.frontend_happygreen.api.ApiService
 import com.example.frontend_happygreen.api.RetrofitClient
 import com.example.frontend_happygreen.api.UpdatePointsRequest
@@ -60,15 +101,16 @@ val EcoCardBackground = Color(0xFFFFFFF)
 data class Waste(
     val id: Int,
     val name: String,
-    val imageResId: Int,
+    val imageUrl: String, // Cambiato da imageResId
     val decompositionTimeYears: Float,
-    val pollutionLevel: Int, // da 1 a 10
-    val prevalenceLevel: Int, // da 1 a 10, quanto è diffuso sulla Terra
-    val carbonFootprint: Float, // kg CO2 equivalente per unità
-    val recyclingComplexity: Int, // da 1 a 10, quanto è difficile da riciclare
-    val toxicityLevel: Int, // da 1 a 10, livello di tossicità
+    val pollutionLevel: Int,
+    val prevalenceLevel: Int,
+    val carbonFootprint: Float,
+    val recyclingComplexity: Int,
+    val toxicityLevel: Int,
     val educationalFact: String
 )
+
 
 enum class QuestionType {
     DECOMPOSITION_TIME,
@@ -84,83 +126,83 @@ class EcoGameViewModel : ViewModel() {
     private val apiService = RetrofitClient.create(ApiService::class.java)
     private val wasteDatabase = listOf(
         Waste(
-            1, "Bottiglia PET 500ml", R.drawable.placeholder, 450f, 7, 10, 0.82f, 6, 3,
+            1, "Bottiglia PET 500ml", "https://sora.chatgpt.com/g/gen_01jvzhcfsjfxyte5pg61w3q8nn", 450f, 7, 10, 0.82f, 6, 3,
             "Una bottiglia di plastica PET produce 82g di CO2 durante la produzione"
         ),
         Waste(
-            2, "Sacchetto biodegradabile", R.drawable.placeholder, 0.25f, 3, 7, 0.15f, 8, 2,
+            2, "Sacchetto biodegradabile", "https://sora.chatgpt.com/g/gen_01jvzhe51efbrvpgxhpkwejm0j", 0.25f, 3, 7, 0.15f, 8, 2,
             "I sacchetti biodegradabili necessitano di condizioni specifiche per decomporsi"
         ),
         Waste(
-            3, "Lattina alluminio 330ml", R.drawable.placeholder, 80f, 5, 9, 1.7f, 9, 2,
+            3, "Lattina alluminio 330ml", "https://sora.chatgpt.com/g/gen_01jvzhjcy1ebnr1vtggnns3phk", 80f, 5, 9, 1.7f, 9, 2,
             "Riciclare alluminio risparmia il 95% dell'energia rispetto alla produzione primaria"
         ),
         Waste(
-            4, "Buccia d'arancia", R.drawable.placeholder, 0.17f, 1, 6, 0.01f, 10, 1,
+            4, "Buccia d'arancia", "https://sora.chatgpt.com/g/gen_01jvzhkz35f9q9068azw75fpdt", 0.17f, 1, 6, 0.01f, 10, 1,
             "Gli agrumi contengono oli essenziali che rallentano la decomposizione"
         ),
         Waste(
-            5, "Filtro sigaretta", R.drawable.placeholder, 12f, 9, 10, 0.05f, 1, 8,
+            5, "Filtro sigaretta", "https://sora.chatgpt.com/g/gen_01jvzhnnt3eqjbmxdwg06qwpbv", 12f, 9, 10, 0.05f, 1, 8,
             "I filtri contengono acetato di cellulosa e oltre 4000 sostanze chimiche"
         ),
         Waste(
-            6, "Pannolino usa e getta", R.drawable.placeholder, 500f, 6, 8, 5.5f, 2, 4,
+            6, "Pannolino usa e getta", "https://sora.chatgpt.com/g/gen_01jvzhra46ee2bsfavxhxnmrjs", 500f, 6, 8, 5.5f, 2, 4,
             "Un bambino usa mediamente 6000 pannolini nei primi 3 anni di vita"
         ),
         Waste(
-            7, "Rivista patinata", R.drawable.placeholder, 0.08f, 3, 6, 0.9f, 7, 2,
+            7, "Rivista patinata", "https://sora.chatgpt.com/g/gen_01jvzj0bfye52vfvnw3dwzptyz", 0.08f, 3, 6, 0.9f, 7, 2,
             "La carta patinata contiene rivestimenti che complicano il riciclaggio"
         ),
         Waste(
-            8, "Bicchiere carta plastificato", R.drawable.placeholder, 20f, 6, 8, 0.24f, 3, 3,
+            8, "Bicchiere carta plastificato", "https://sora.chatgpt.com/g/gen_01jvzjbx1we6zvbm2jgq1ncvb3", 20f, 6, 8, 0.24f, 3, 3,
             "Il rivestimento in polietilene rende questi bicchieri difficili da riciclare"
         ),
         Waste(
-            9, "Bottiglia vetro scuro", R.drawable.placeholder, 4000f, 3, 6, 0.5f, 9, 2,
+            9, "Bottiglia vetro scuro", "https://sora.chatgpt.com/g/gen_01jvzja54eezgsc6kj58kac37e", 4000f, 3, 6, 0.5f, 9, 2,
             "Il vetro scuro è infinitamente riciclabile senza perdita di qualità"
         ),
         Waste(
-            10, "Chewing gum", R.drawable.placeholder, 5f, 6, 9, 0.02f, 1, 5,
+            10, "Chewing gum", "https://sora.chatgpt.com/g/gen_01jvzjds56fhns63p0vm872gdq", 5f, 6, 9, 0.02f, 1, 5,
             "La gomma da masticare è fatta di polimeri sintetici non biodegradabili"
         ),
         Waste(
-            11, "Smartphone", R.drawable.placeholder, 1000f, 10, 7, 85f, 4, 9,
+            11, "Smartphone", "https://discord.com/channels/@me/1375560507850887309", 1000f, 10, 7, 85f, 4, 9,
             "Uno smartphone contiene oltre 60 elementi della tavola periodica"
         ),
         Waste(
-            12, "Batteria litio", R.drawable.placeholder, 600f, 10, 6, 12f, 5, 10,
+            12, "Batteria litio", "https://sora.chatgpt.com/g/gen_01jvzke9daf21t38h24emvtbqx", 600f, 10, 6, 12f, 5, 10,
             "Le batterie al litio rilasciano gas tossici se smaltite incorrettamente"
         ),
         Waste(
-            13, "Mascherina chirurgica", R.drawable.placeholder, 450f, 7, 9, 0.06f, 2, 4,
+            13, "Mascherina chirurgica", "https://sora.chatgpt.com/g/gen_01jvzjhfhse8p8j0xgmm1hyq55", 450f, 7, 9, 0.06f, 2, 4,
             "Le mascherine sono fatte di polipropilene, un tipo di plastica"
         ),
         Waste(
-            14, "Capsula caffè alluminio", R.drawable.placeholder, 80f, 6, 7, 0.3f, 6, 3,
+            14, "Capsula caffè alluminio", "https://sora.chatgpt.com/g/gen_01jvzjeh3eev0rhxn96z31kpy7", 80f, 6, 7, 0.3f, 6, 3,
             "Le capsule miste alluminio-plastica richiedono separazione per il riciclaggio"
         ),
         Waste(
-            15, "Scontrino termico", R.drawable.placeholder, 0.03f, 7, 9, 0.002f, 2, 6,
+            15, "Scontrino termico", "https://sora.chatgpt.com/g/gen_01jvzjbnj1ef29yna0ey6ras2f", 0.03f, 7, 9, 0.002f, 2, 6,
             "La carta termica contiene BPA, un interferente endocrino"
         ),
         Waste(
-            16, "Polistirolo imballaggio", R.drawable.placeholder, 500f, 8, 8, 1.8f, 2, 4,
+            16, "Polistirolo imballaggio", "https://sora.chatgpt.com/g/gen_01jvzj6sqserf9bfxbk4v527zj", 500f, 8, 8, 1.8f, 2, 4,
             "Il polistirolo è composto al 95% da aria ma è praticamente non riciclabile"
         ),
         Waste(
-            17, "Tessuto sintetico", R.drawable.placeholder, 200f, 6, 7, 9.5f, 3, 5,
+            17, "Tessuto sintetico", "https://sora.chatgpt.com/g/gen_01jvzj4rcjfr49e13qv1hgd5ke", 200f, 6, 7, 9.5f, 3, 5,
             "I tessuti sintetici rilasciano microplastiche ad ogni lavaggio"
         ),
         Waste(
-            18, "Pneumatico auto", R.drawable.placeholder, 2000f, 8, 4, 45f, 5, 6,
+            18, "Pneumatico auto", "https://sora.chatgpt.com/g/gen_01jvzhzwy2fjt9h3fb2hcmvjvq", 2000f, 8, 4, 45f, 5, 6,
             "Un pneumatico può essere trasformato in asfalto o energia"
         ),
         Waste(
-            19, "Lampadina LED", R.drawable.placeholder, 25f, 4, 5, 2.1f, 7, 4,
+            19, "Lampadina LED", "https://sora.chatgpt.com/g/gen_01jvzhkrk5fhza86v7966xrn7g", 25f, 4, 5, 2.1f, 7, 4,
             "Le LED durano 25 volte più delle lampadine tradizionali"
         ),
         Waste(
-            20, "Cibo scaduto confezionato", R.drawable.placeholder, 0.5f, 5, 8, 2.3f, 6, 3,
+            20, "Cibo scaduto confezionato", "https://sora.chatgpt.com/g/gen_01jvzhfje0eb6ar4p0t488161f", 0.5f, 5, 8, 2.3f, 6, 3,
             "Il 30% del cibo prodotto nel mondo viene sprecato"
         )
     )
@@ -252,6 +294,7 @@ class EcoGameViewModel : ViewModel() {
             }
         }
     }
+
 
     fun startNewRound() {
         // Progressione livelli più graduale
@@ -933,13 +976,14 @@ fun EnhancedWasteCard(
                             .background(Color.White),
                         contentAlignment = Alignment.Center
                     ) {
-                        Image(
-                            painter = painterResource(id = it.imageResId),
+                        AsyncImage(
+                            model = it.name,
                             contentDescription = it.name,
                             contentScale = ContentScale.Fit,
                             modifier = Modifier
                                 .size(100.dp)
-                                .padding(8.dp)
+                                .padding(8.dp),
+                            onError = { Log.e("ImageLoad", "Errore nel caricamento immagine da: ") }
                         )
                     }
                 }
