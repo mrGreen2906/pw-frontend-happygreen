@@ -128,6 +128,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
@@ -593,8 +594,8 @@ fun EcoCentersMapScreen(
     // Animazione per altezza della toolbar
     val toolbarHeight by animateDpAsState(
         targetValue = when {
-            toolbarExpanded -> 325.dp
-            else -> 150.dp
+            toolbarExpanded -> 350.dp
+            else -> 120.dp
         },
         animationSpec = tween(300)
     )
@@ -627,7 +628,6 @@ fun EcoCentersMapScreen(
         }
     }
 
-
     LaunchedEffect(Unit) {
         Configuration.getInstance().userAgentValue = context.packageName
     }
@@ -643,7 +643,6 @@ fun EcoCentersMapScreen(
             }
         }
     }
-
 
     // Gestione degli effetti del punto selezionato
     LaunchedEffect(selectedPoint) {
@@ -869,6 +868,450 @@ enum class ControlsTab(val icon: ImageVector, val label: String) {
 }
 
 /**
+ * Controlli per la visualizzazione mappa - VERSIONE COMPLETAMENTE MIGLIORATA
+ */
+@Composable
+fun MapControls(
+    toolbarHeight: androidx.compose.ui.unit.Dp,
+    toolbarExpanded: Boolean,
+    onToolbarToggle: () -> Unit,
+    controlsTab: ControlsTab,
+    onTabChange: (ControlsTab) -> Unit,
+    materialFilter: String,
+    onMaterialFilterChange: (String) -> Unit,
+    selectedTypeFilter: WastePointType?,
+    onTypeFilterChange: (WastePointType?) -> Unit,
+    searchRadius: Int,
+    onRadiusChange: (Int) -> Unit,
+    onBack: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(toolbarHeight)
+            .padding(top = 44.dp)
+            .background(
+                color = Color.White.copy(alpha = 0.97f),
+                shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)
+            )
+            .shadow(
+                elevation = 6.dp,
+                shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)
+            )
+    ) {
+        // HEADER PRINCIPALE - Layout semplificato e bilanciato
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(76.dp)
+        ) {
+            // Griglia a 3 colonne con peso uguale
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // COLONNA SINISTRA - 72dp fissi
+                Box(
+                    modifier = Modifier.width(72.dp),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    Surface(
+                        onClick = onBack,
+                        shape = CircleShape,
+                        color = Green100.copy(alpha = 0.8f),
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBack,
+                                contentDescription = "Indietro",
+                                tint = Green600,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+                }
+
+                // COLONNA CENTRALE - Espandibile, perfettamente centrata
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Punti di Raccolta",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = (-0.3).sp
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = Green600.copy(alpha = 0.12f),
+                        modifier = Modifier.padding(top = 4.dp)
+                    ) {
+                        Text(
+                            text = controlsTab.label.uppercase(),
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.8.sp
+                            ),
+                            color = Green600,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
+                        )
+                    }
+                }
+
+                // COLONNA DESTRA - 72dp fissi (stesso peso della sinistra)
+                Box(
+                    modifier = Modifier.width(72.dp),
+                    contentAlignment = Alignment.CenterEnd
+                ) {
+                    Surface(
+                        onClick = onToolbarToggle,
+                        shape = CircleShape,
+                        color = if (toolbarExpanded) Green600 else Green100.copy(alpha = 0.8f),
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = if (toolbarExpanded)
+                                    Icons.Default.ExpandLess
+                                else
+                                    Icons.Default.ExpandMore,
+                                contentDescription = if (toolbarExpanded) "Comprimi" else "Espandi",
+                                tint = if (toolbarExpanded) Color.White else Green600,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // TAB NAVIGATION - Sotto il titolo principale
+        if (toolbarExpanded) {
+            // Divisore elegante
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .padding(horizontal = 32.dp)
+                    .background(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Green600.copy(alpha = 0.3f),
+                                Color.Transparent
+                            )
+                        )
+                    )
+            )
+
+            // Tab bar centrata e migliorata
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                ControlsTab.values().forEach { tab ->
+                    val selected = tab == controlsTab
+
+                    Surface(
+                        onClick = { onTabChange(tab) },
+                        shape = RoundedCornerShape(26.dp),
+                        color = if (selected) Green600 else Green100.copy(alpha = 0.5f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 6.dp)
+                            .height(52.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = tab.icon,
+                                contentDescription = null,
+                                tint = if (selected) Color.White else Green600,
+                                modifier = Modifier.size(20.dp)
+                            )
+
+                            Spacer(modifier = Modifier.height(2.dp))
+
+                            Text(
+                                text = tab.label,
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                                ),
+                                color = if (selected) Color.White else Green600
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // CONTENUTO ESPANDIBILE
+        AnimatedVisibility(
+            visible = toolbarExpanded,
+            enter = slideInVertically { -it } + fadeIn(tween(300)),
+            exit = slideOutVertically { -it } + fadeOut(tween(200))
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = Color.White.copy(alpha = 0.98f)
+            ) {
+                when (controlsTab) {
+                    ControlsTab.SEARCH -> SearchControlsImproved(
+                        materialFilter = materialFilter,
+                        onMaterialFilterChange = onMaterialFilterChange
+                    )
+                    ControlsTab.FILTER -> FilterControlsImproved(
+                        selectedTypeFilter = selectedTypeFilter,
+                        onTypeFilterChange = onTypeFilterChange,
+                        searchRadius = searchRadius,
+                        onRadiusChange = onRadiusChange
+                    )
+                    ControlsTab.INFO -> InfoControlsImproved()
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Controlli di ricerca migliorati
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SearchControlsImproved(
+    materialFilter: String,
+    onMaterialFilterChange: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(24.dp)
+    ) {
+        OutlinedTextField(
+            value = materialFilter,
+            onValueChange = onMaterialFilterChange,
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = {
+                Text(
+                    "Cerca materiale (es. plastica, vetro, pile...)",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = null,
+                    tint = Green600
+                )
+            },
+            trailingIcon = {
+                if (materialFilter.isNotEmpty()) {
+                    IconButton(onClick = { onMaterialFilterChange("") }) {
+                        Icon(
+                            imageVector = Icons.Default.Clear,
+                            contentDescription = "Cancella",
+                            tint = Color.Gray
+                        )
+                    }
+                }
+            },
+            shape = RoundedCornerShape(16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Green600,
+                unfocusedBorderColor = Color.Gray.copy(alpha = 0.3f),
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color.White
+            ),
+            singleLine = true
+        )
+    }
+}
+
+/**
+ * Controlli filtri migliorati
+ */
+@Composable
+fun FilterControlsImproved(
+    selectedTypeFilter: WastePointType?,
+    onTypeFilterChange: (WastePointType?) -> Unit,
+    searchRadius: Int,
+    onRadiusChange: (Int) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(24.dp)
+    ) {
+        Text(
+            text = "Tipo di punto raccolta",
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.Bold
+            ),
+            color = MaterialTheme.colorScheme.onSurface
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            item {
+                FilterChip(
+                    selected = selectedTypeFilter == null,
+                    onClick = { onTypeFilterChange(null) },
+                    label = { Text("Tutti") },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.AllInclusive,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                )
+            }
+
+            items(WastePointType.values()) { type ->
+                FilterChip(
+                    selected = selectedTypeFilter == type,
+                    onClick = { onTypeFilterChange(type) },
+                    label = { Text(type.displayName) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = type.icon,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Raggio di ricerca",
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold
+                ),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = Green100
+            ) {
+                Text(
+                    text = "${searchRadius / 1000} km",
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = Green600,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Slider(
+            value = searchRadius.toFloat(),
+            onValueChange = { onRadiusChange(it.toInt()) },
+            valueRange = 1000f..20000f,
+            steps = 19,
+            colors = SliderDefaults.colors(
+                thumbColor = Green600,
+                activeTrackColor = Green600,
+                inactiveTrackColor = Green100
+            )
+        )
+    }
+}
+
+/**
+ * Controlli info migliorati
+ */
+@Composable
+fun InfoControlsImproved() {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            Text(
+                text = "Legenda simboli",
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold
+                ),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+
+        items(WastePointType.values()) { type ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = Green100.copy(alpha = 0.4f)
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = Green600,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = type.icon,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    Text(
+                        text = type.displayName,
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            fontWeight = FontWeight.SemiBold
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
  * Vista mappa con supporto per effetti
  */
 @Composable
@@ -972,345 +1415,6 @@ fun MapView(
                     .blur(6.dp)
                     .background(Color.Black.copy(alpha = 0.2f))
             )
-        }
-    }
-}
-
-/**
- * Controlli per la visualizzazione mappa
- */
-@Composable
-fun MapControls(
-    toolbarHeight: androidx.compose.ui.unit.Dp,
-    toolbarExpanded: Boolean,
-    onToolbarToggle: () -> Unit,
-    controlsTab: ControlsTab,
-    onTabChange: (ControlsTab) -> Unit,
-    materialFilter: String,
-    onMaterialFilterChange: (String) -> Unit,
-    selectedTypeFilter: WastePointType?,
-    onTypeFilterChange: (WastePointType?) -> Unit,
-    searchRadius: Int,
-    onRadiusChange: (Int) -> Unit,
-    onBack: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(toolbarHeight)
-            .padding(top = 44.dp) // Added top padding to prevent overlapping with status bar
-            .background(
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-                shape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp)
-            )
-            .shadow(elevation = 8.dp, shape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp))
-    ) {
-        // Toolbar principale
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(60.dp)
-                .padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Pulsante indietro
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.Default.ArrowBack,
-                    contentDescription = "Indietro",
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
-
-            // Titolo - migliorato centraggio e stile
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Punti di Raccolta",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    ),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-
-            // Tab di navigazione
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                ControlsTab.values().forEach { tab ->
-                    val selected = tab == controlsTab
-                    IconButton(
-                        onClick = { onTabChange(tab) },
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(
-                                if (selected) MaterialTheme.colorScheme.primaryContainer
-                                else Color.Transparent
-                            )
-                    ) {
-                        Icon(
-                            imageVector = tab.icon,
-                            contentDescription = tab.label,
-                            tint = if (selected)
-                                MaterialTheme.colorScheme.primary
-                            else
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        )
-                    }
-                }
-
-                IconButton(onClick = onToolbarToggle) {
-                    Icon(
-                        imageVector = if (toolbarExpanded)
-                            Icons.Default.ExpandLess
-                        else
-                            Icons.Default.ExpandMore,
-                        contentDescription = if (toolbarExpanded) "Comprimi" else "Espandi",
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
-        }
-
-        // Contenuto espandibile in base al tab selezionato
-        AnimatedVisibility(visible = toolbarExpanded) {
-            when (controlsTab) {
-                ControlsTab.SEARCH -> SearchControls(
-                    materialFilter = materialFilter,
-                    onMaterialFilterChange = onMaterialFilterChange
-                )
-                ControlsTab.FILTER -> FilterControls(
-                    selectedTypeFilter = selectedTypeFilter,
-                    onTypeFilterChange = onTypeFilterChange,
-                    searchRadius = searchRadius,
-                    onRadiusChange = onRadiusChange
-                )
-                ControlsTab.INFO -> InfoControls()
-            }
-        }
-    }
-}
-
-/**
- * Controlli di ricerca
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun SearchControls(
-    materialFilter: String,
-    onMaterialFilterChange: (String) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
-    ) {
-        // Campo di ricerca con icona
-        OutlinedTextField(
-            value = materialFilter,
-            onValueChange = onMaterialFilterChange,
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Cerca materiale (es. plastica, vetro, pile...)") },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = null,
-                    tint = Green600
-                )
-            },
-            trailingIcon = {
-                if (materialFilter.isNotEmpty()) {
-                    IconButton(onClick = { onMaterialFilterChange("") }) {
-                        Icon(
-                            imageVector = Icons.Default.Clear,
-                            contentDescription = "Cancella",
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        )
-                    }
-                }
-            },
-            shape = RoundedCornerShape(24.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Green600,
-                unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
-            ),
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search)
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Suggerimenti rapidi
-        Text(
-            text = "Suggerimenti:",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(vertical = 4.dp)
-        ) {
-            val commonMaterials = listOf("Plastica", "Carta", "Vetro", "Pile", "Organico", "Elettronici")
-            items(commonMaterials) { material ->
-                SuggestionChip(
-                    onClick = { onMaterialFilterChange(material) },
-                    label = { Text(material) },
-                    colors = SuggestionChipDefaults.suggestionChipColors(
-                        containerColor = Green100,
-                        labelColor = Green800
-                    )
-                )
-            }
-        }
-    }
-}
-
-/**
- * Controlli dei filtri
- */
-@Composable
-fun FilterControls(
-    selectedTypeFilter: WastePointType?,
-    onTypeFilterChange: (WastePointType?) -> Unit,
-    searchRadius: Int,
-    onRadiusChange: (Int) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
-    ) {
-        // Filtro per tipo
-        Text(
-            text = "Tipo di punto",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        // Chips orizzontali per i tipi
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(vertical = 4.dp)
-        ) {
-            item {
-                FilterChip(
-                    selected = selectedTypeFilter == null,
-                    onClick = { onTypeFilterChange(null) },
-                    label = { Text("Tutti") },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.AllInclusive,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                )
-            }
-
-            items(WastePointType.values()) { type ->
-                FilterChip(
-                    selected = selectedTypeFilter == type,
-                    onClick = { onTypeFilterChange(type) },
-                    label = { Text(type.displayName) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = type.icon,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Raggio di ricerca
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Raggio: ${searchRadius / 1000} km",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.width(100.dp)
-            )
-
-            Slider(
-                value = searchRadius.toFloat(),
-                onValueChange = { onRadiusChange(it.toInt()) },
-                valueRange = 1000f..20000f,
-                steps = 19,
-                modifier = Modifier.weight(1f),
-                colors = SliderDefaults.colors(
-                    thumbColor = Green600,
-                    activeTrackColor = Green600
-                )
-            )
-        }
-    }
-}
-
-/**
- * Controlli informativi
- */
-@Composable
-fun InfoControls() {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
-    ) {
-        Text(
-            text = "Legenda punti",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Legenda tipi di punto
-        WastePointType.values().forEach { type ->
-            Row(
-                modifier = Modifier.padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = Green600.copy(alpha = 0.2f),
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = type.icon,
-                            contentDescription = null,
-                            tint = Green600,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Text(
-                    text = type.displayName,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
         }
     }
 }
@@ -1769,8 +1873,6 @@ fun PointDetailsCard(
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
-            // Removed phone/website section since they're always empty
-
             // Materiali accettati
             if (point.acceptedMaterials.isNotEmpty()) {
                 Text(
@@ -1814,6 +1916,7 @@ fun PointDetailsCard(
         }
     }
 }
+
 /**
  * Card informativa per dettagli
  */
@@ -2983,8 +3086,6 @@ private fun requestLocationUpdatesWithTimeout(
             setMaxUpdates(1)
             setGranularity(Granularity.GRANULARITY_FINE)
         }.build()
-
-
 
         val locationCallback = object : LocationCallback() {
             override fun onLocationResult(locationResult: LocationResult) {

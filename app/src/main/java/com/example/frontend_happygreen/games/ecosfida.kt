@@ -70,7 +70,6 @@ data class Waste(
     val educationalFact: String
 )
 
-// Enum class per il tipo di domanda con più varietà
 enum class QuestionType {
     DECOMPOSITION_TIME,
     POLLUTION_LEVEL,
@@ -80,12 +79,9 @@ enum class QuestionType {
     TOXICITY_LEVEL
 }
 
-// ViewModel per la logica di gioco migliorata
 class EcoGameViewModel : ViewModel() {
 
     private val apiService = RetrofitClient.create(ApiService::class.java)
-
-    // Database dei rifiuti con dati più realistici e difficili
     private val wasteDatabase = listOf(
         Waste(
             1, "Bottiglia PET 500ml", R.drawable.placeholder, 450f, 7, 10, 0.82f, 6, 3,

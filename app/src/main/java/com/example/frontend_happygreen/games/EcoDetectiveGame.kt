@@ -261,7 +261,6 @@ fun EcoDetectiveGameScreen(
     // Avvia il timer del gioco
     LaunchedEffect(Unit) {
         viewModel.startTimer {
-            // Callback quando il gioco finisce per timeout
         }
     }
 
