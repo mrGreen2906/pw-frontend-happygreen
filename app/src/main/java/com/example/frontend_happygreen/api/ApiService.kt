@@ -8,6 +8,26 @@ import retrofit2.Response
 import retrofit2.http.*
 
 interface ApiService {
+    @GET("groups/my_groups/")
+    suspend fun getMyGroups(@Header("Authorization") token: String): Response<List<GroupWithCounters>>
+
+    // AGGIORNATO: Endpoint per cercare tutti i gruppi con contatori
+    @GET("groups/")
+    suspend fun getGroups(@Header("Authorization") token: String): Response<List<GroupWithCounters>>
+
+    // Altre chiamate API esistenti...
+    @POST("groups/")
+    suspend fun createGroup(
+        @Body group: Group,
+        @Header("Authorization") token: String
+    ): Response<Group>
+
+    @POST("groups/{groupId}/join/")
+    suspend fun joinGroup(
+        @Path("groupId") groupId: Int,
+        @Header("Authorization") token: String
+    ): Response<Any>
+
     @POST("auth/login/")
     suspend fun login(@Body request: AuthRequest): Response<AuthResponse>
 
@@ -24,7 +44,10 @@ interface ApiService {
     suspend fun getCurrentUser(@Header("Authorization") token: String): Response<UserData>
 
     @GET("users/{id}/")
-    suspend fun getUserById(@Path("id") id: Int, @Header("Authorization") token: String): Response<UserData>
+    suspend fun getUserById(
+        @Path("id") id: Int,
+        @Header("Authorization") token: String
+    ): Response<UserData>
 
     @PUT("users/{id}/")
     suspend fun updateUser(
@@ -34,11 +57,6 @@ interface ApiService {
     ): Response<UserData>
 
     // Groups
-    @GET("groups/")
-    suspend fun getGroups(@Header("Authorization") token: String): Response<List<Group>>
-
-    @POST("groups/")
-    suspend fun createGroup(@Body group: Group, @Header("Authorization") token: String): Response<Group>
 
     @GET("group-memberships/")
     suspend fun getGroupMemberships(@Header("Authorization") token: String): Response<List<GroupMembership>>
@@ -54,7 +72,10 @@ interface ApiService {
 
     // CORRETTO: Usa Post per POST requests (invio dati)
     @POST("posts/")
-    suspend fun createPost(@Body post: CreatePostRequest, @Header("Authorization") token: String): Response<PostResponse>
+    suspend fun createPost(
+        @Body post: CreatePostRequest,
+        @Header("Authorization") token: String
+    ): Response<PostResponse>
 
     @POST("posts/")
     suspend fun createPost(@Body post: Post, @Header("Authorization") token: String): Response<Post>
@@ -82,7 +103,10 @@ interface ApiService {
 
     // Comments
     @POST("comments/")
-    suspend fun createComment(@Body comment: Comment, @Header("Authorization") token: String): Response<Comment>
+    suspend fun createComment(
+        @Body comment: Comment,
+        @Header("Authorization") token: String
+    ): Response<Comment>
 
     // Badges
     @GET("badges/")
@@ -121,11 +145,6 @@ interface ApiService {
         @Header("Authorization") token: String
     ): Response<GroupDetailResponse>
 
-    @POST("groups/{id}/join/")
-    suspend fun joinGroup(
-        @Path("id") groupId: Int,
-        @Header("Authorization") token: String
-    ): Response<GroupMembership>
 
     @DELETE("groups/{id}/remove_member/")
     suspend fun removeGroupMember(
@@ -134,12 +153,31 @@ interface ApiService {
         @Header("Authorization") token: String
     ): Response<Unit>
 
-    @GET("groups/my_groups/")
-    suspend fun getMyGroups(
-        @Header("Authorization") token: String
-    ): Response<List<Group>>
 }
-
+data class GroupWithCounters(
+    val id: Int?,
+    val name: String,
+    val description: String?,
+    val created_at: String?,
+    val owner: Int,
+    val owner_name: String?,      // Nome del proprietario
+    val member_count: Int?,       // Contatore membri reale
+    val post_count: Int?          // Contatore post reale
+) {
+    // Converte in Group per compatibilità con il codice esistente
+    fun toGroup(): Group {
+        return Group(
+            id = this.id,
+            name = this.name,
+            description = this.description,
+            ownerId = this.owner,
+            ownerName = this.owner_name,
+            memberCount = this.member_count,
+            postCount = this.post_count,
+            createdAt = this.created_at
+        )
+    }
+}
 // Classi per le richieste e risposte
 data class UpdatePointsRequest(
     val points: Int,

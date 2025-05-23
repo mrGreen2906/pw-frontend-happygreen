@@ -52,6 +52,9 @@ data class Group(
     val id: Int? = null,
     val name: String,
     val description: String? = null,
+    val ownerName: String? = null, // NUOVO: Nome del proprietario
+    val memberCount: Int? = null,  // NUOVO: Contatore dei membri
+    val postCount: Int? = null,    // NUOVO: Contatore dei post
     @SerializedName("created_at") val createdAt: String? = null,
     @SerializedName("owner") val ownerId: Int
 ) {
@@ -75,59 +78,18 @@ data class GroupMembership(
  * Modello ClassRoom con validazione robusta - AGGIORNATO
  */
 data class ClassRoom(
-    val id: Int = 0,
+    val id: Int,
     val name: String,
     val description: String = "",
     val backgroundImageId: Int,
-    val teacherName: String = "Unknown Teacher",
+    val teacherName: String = "",
     val memberCount: Int = 0,
+    val postCount: Int = 0, // NUOVO: Contatore dei post reale
     val ownerID: Int? = null,
-    val userRole: String? = null
+    val userRole: String = "member" // "admin", "teacher", "student", "member"
 ) {
-    /**
-     * Validazione completa del ClassRoom
-     * IMPORTANTE: Un ClassRoom è valido solo se ha un ID > 0 e un nome non vuoto
-     */
     fun isValid(): Boolean {
-        val hasValidId = id > 0
-        val hasValidName = name.isNotBlank() && name.trim().isNotEmpty()
-        val hasValidBackgroundId = backgroundImageId > 0
-
-        return hasValidId && hasValidName && hasValidBackgroundId
-    }
-
-    /**
-     * Metodo di utilità per logging e debug
-     */
-    fun getDebugInfo(): String {
-        return "ClassRoom(id=$id, name='$name', valid=${isValid()})"
-    }
-
-    /**
-     * Crea una copia con un nuovo ID (utile quando si riceve l'ID dal server)
-     */
-    fun withId(newId: Int): ClassRoom {
-        return this.copy(id = newId)
-    }
-
-    /**
-     * Verifica se questo è il proprietario del gruppo
-     */
-    fun isOwnedBy(userId: Int?): Boolean {
-        return userId != null && ownerID == userId
-    }
-
-    /**
-     * Ottiene ruolo dell'utente in formato leggibile
-     */
-    fun getUserRoleDisplayName(): String {
-        return when (userRole) {
-            "admin" -> "Amministratore"
-            "teacher" -> "Insegnante"
-            "student" -> "Studente"
-            "member" -> "Membro"
-            else -> "Ruolo sconosciuto"
-        }
+        return id > 0 && name.isNotBlank()
     }
 }
 
@@ -139,27 +101,6 @@ data class Comment(
     @SerializedName("post") val postId: Int,
     @SerializedName("user") val userId: Int,
     val content: String,
-    @SerializedName("created_at") val createdAt: String? = null
-)
-
-/**
- * NUOVO: Modelli per like
- */
-data class PostLike(
-    val id: Int? = null,
-    @SerializedName("post") val postId: Int,
-    @SerializedName("user") val userId: Int,
-    @SerializedName("created_at") val createdAt: String? = null
-)
-
-/**
- * NUOVO: Modelli per reactions
- */
-data class PostReaction(
-    val id: Int? = null,
-    @SerializedName("post") val postId: Int,
-    @SerializedName("user") val userId: Int,
-    val reaction: String,
     @SerializedName("created_at") val createdAt: String? = null
 )
 
@@ -180,18 +121,7 @@ data class UserBadge(
     @SerializedName("earned_at") val earnedAt: String? = null
 )
 
-// Dettaglio del gruppo con membri
-data class GroupDetail(
-    val id: Int,
-    val name: String,
-    val description: String?,
-    @SerializedName("created_at") val createdAt: String,
-    @SerializedName("owner") val ownerId: Int,
-    @SerializedName("owner_details") val ownerDetails: UserData,
-    val members: List<MembershipResponse>
-)
 
-// Risposta dettagliata del gruppo
 data class GroupDetailResponse(
     val id: Int,
     val name: String,
@@ -199,32 +129,22 @@ data class GroupDetailResponse(
     @SerializedName("created_at") val createdAt: String? = null,
     val owner: Int,
     @SerializedName("owner_details") val ownerDetails: UserData,
-    val members: List<MemberData>
-) {
-    /**
-     * Converte in ClassRoom con validazione
-     */
-    fun toClassRoom(currentUserId: Int? = null): ClassRoom? {
-        if (id <= 0 || name.isBlank()) {
-            return null
-        }
-
-        val isOwner = currentUserId == owner
-        val memberRole = members.find { it.user.id == currentUserId }?.role
-
-        return ClassRoom(
-            id = id,
-            name = name,
-            description = description ?: "",
-            backgroundImageId = com.example.frontend_happygreen.R.drawable.happy_green_logo,
-            teacherName = if (isOwner) "Tu (Proprietario)" else ownerDetails.username,
-            memberCount = members.size,
-            ownerID = owner,
-            userRole = memberRole ?: if (isOwner) "admin" else "member"
-        )
-    }
+    val members: List<MemberData>,
+    val owner_name: String?,      // NUOVO: Nome del proprietario dal backend
+    val member_count: Int?,       // NUOVO: Contatore membri dal backend
+    val post_count: Int?          // NUOVO: Contatore post dal backend
+)
+fun GroupDetailResponse.toGroup(): Group {
+    return Group(
+        id = this.id,
+        name = this.name,
+        description = this.description,
+        ownerId = this.owner,
+        ownerName = this.owner_name,
+        memberCount = this.member_count,
+        postCount = this.post_count,
+    )
 }
-
 data class MemberData(
     val id: Int,
     val user: UserData,
@@ -236,9 +156,6 @@ data class MemberData(
 data class RemoveMemberRequest(
     @SerializedName("user_id") val userId: Int
 )
-
-// Risposta alla richiesta di aggiungere un membro
-typealias MembershipResponse = GroupMembership
 
 // Post con validazione migliorata e supporto completo
 data class Post(
@@ -362,15 +279,6 @@ fun Group.toClassRoom(currentUserId: Int? = null): ClassRoom? {
  */
 fun List<ClassRoom>.filterValid(): List<ClassRoom> {
     return this.filter { it.isValid() }
-}
-
-/**
- * Utility per logging di debug di una lista di ClassRoom
- */
-fun List<ClassRoom>.logDebugInfo(tag: String = "ClassRoom") {
-    this.forEachIndexed { index, classRoom ->
-        android.util.Log.d(tag, "[$index] ${classRoom.getDebugInfo()}")
-    }
 }
 
 /**

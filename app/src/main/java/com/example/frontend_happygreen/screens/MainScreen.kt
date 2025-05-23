@@ -546,54 +546,54 @@ class MainScreenViewModel : ViewModel() {
 
                 Log.d("MainScreenViewModel", "Loading groups for authenticated user...")
 
-                // USA L'ENDPOINT CORRETTO: my_groups invece di groups
+                // Usa l'endpoint aggiornato che restituisce GroupWithCounters
                 val response = apiService.getMyGroups(token)
 
                 if (response.isSuccessful && response.body() != null) {
-                    val userGroups = response.body()!!
+                    val userGroupsWithCounters = response.body()!!
 
-                    Log.d("MainScreenViewModel", "Received ${userGroups.size} groups for user")
+                    Log.d("MainScreenViewModel", "Received ${userGroupsWithCounters.size} groups for user")
 
-                    // CONVERSIONE CORRETTA: Mappa con tutti i campi necessari incluso l'ID
-                    classes.value = userGroups.mapNotNull { group ->
-                        // Verifica che il gruppo abbia un ID valido
-                        val groupId = group.id
+                    // Conversione con i contatori reali
+                    classes.value = userGroupsWithCounters.mapNotNull { groupData ->
+                        val groupId = groupData.id
                         if (groupId == null || groupId <= 0) {
-                            Log.w("MainScreenViewModel", "Skipping group with invalid ID: ${group.name}")
+                            Log.w("MainScreenViewModel", "Skipping group with invalid ID: ${groupData.name}")
                             return@mapNotNull null
                         }
 
-                        // Determina il ruolo dell'utente nel gruppo
                         val currentUserId = UserSession.getUserId()
-                        val isOwner = group.ownerId == currentUserId
+                        val isOwner = groupData.owner == currentUserId
                         val teacherName = if (isOwner) {
                             "Tu (Proprietario)"
                         } else {
-                            "Membro"
+                            groupData.owner_name ?: "Proprietario sconosciuto"
                         }
 
-                        // Crea ClassRoom con ID corretto
                         ClassRoom(
-                            id = groupId, // IMPORTANTE: Assegna l'ID corretto
-                            name = group.name,
-                            description = group.description ?: "",
-                            backgroundImageId = R.drawable.happy_green_logo,
+                            id = groupId,
+                            name = groupData.name,
+                            description = groupData.description ?: "",
+                            backgroundImageId = R.drawable.pattern_1,
                             teacherName = teacherName,
-                            memberCount = 0, // Potrebbe essere aggiornato in futuro
-                            ownerID = group.ownerId,
+                            // USA I CONTATORI REALI DAL BACKEND
+                            memberCount = groupData.member_count ?: 0,
+                            postCount = groupData.post_count ?: 0,
+                            ownerID = groupData.owner,
                             userRole = if (isOwner) "admin" else "member"
                         )
                     }.also { classRoomList ->
-                        // Log per debug
-                        Log.d("MainScreenViewModel", "Mapped to ${classRoomList.size} ClassRoom objects:")
+                        Log.d("MainScreenViewModel", "Mapped ${classRoomList.size} ClassRoom objects with real counters:")
                         classRoomList.forEach { classRoom ->
-                            Log.d("MainScreenViewModel", "ClassRoom: ID=${classRoom.id}, Name=${classRoom.name}")
+                            Log.d("MainScreenViewModel",
+                                "ClassRoom: ID=${classRoom.id}, Name=${classRoom.name}, " +
+                                        "Members=${classRoom.memberCount}, Posts=${classRoom.postCount}")
                         }
                     }
 
                 } else {
                     val errorBody = response.errorBody()?.string() ?: "Errore sconosciuto"
-                    Log.e("MainScreenViewModel", "Errore caricamento gruppi utente: ${response.code()} - $errorBody")
+                    Log.e("MainScreenViewModel", "Errore caricamento gruppi: ${response.code()} - $errorBody")
 
                     when (response.code()) {
                         401 -> errorMessage.value = "Sessione scaduta, effettua nuovamente l'accesso"
@@ -602,7 +602,6 @@ class MainScreenViewModel : ViewModel() {
                         else -> errorMessage.value = "Errore nel caricamento dei gruppi: ${response.code()}"
                     }
 
-                    // Se non ci sono classi, inizializza lista vuota
                     classes.value = emptyList()
                 }
             } catch (e: Exception) {
@@ -612,14 +611,13 @@ class MainScreenViewModel : ViewModel() {
                     e.message?.contains("network") == true -> "Errore di rete. Controlla la connessione."
                     else -> "Errore di connessione: ${e.message}"
                 }
-
-                // Se non ci sono classi, inizializza lista vuota
                 classes.value = emptyList()
             } finally {
                 isLoading.value = false
             }
         }
     }
+
     /**
      * Unisciti a un gruppo esistente
      */
@@ -671,7 +669,6 @@ class MainScreenViewModel : ViewModel() {
 
                 Log.d("MainScreenViewModel", "Searching groups with query: $query")
 
-                // Usa l'endpoint per ottenere tutti i gruppi
                 val response = apiService.getGroups(token)
 
                 if (response.isSuccessful && response.body() != null) {
@@ -687,7 +684,7 @@ class MainScreenViewModel : ViewModel() {
                         emptySet()
                     }
 
-                    // Filtra i gruppi in base alla query e escludi quelli di cui l'utente è già membro
+                    // Filtra i gruppi in base alla query e escludi quelli dell'utente
                     val filteredGroups = allGroups.filter { group ->
                         val matchesQuery = group.name.contains(query, ignoreCase = true) ||
                                 (group.description?.contains(query, ignoreCase = true) ?: false)
@@ -697,17 +694,20 @@ class MainScreenViewModel : ViewModel() {
 
                     Log.d("MainScreenViewModel", "Found ${filteredGroups.size} matching groups")
 
-                    // Converti in oggetti ClassRoom
-                    val groupsAsClassRooms = filteredGroups.mapNotNull { group ->
-                        val groupId = group.id ?: return@mapNotNull null
+                    // Converti in ClassRoom con contatori reali
+                    val groupsAsClassRooms = filteredGroups.mapNotNull { groupData ->
+                        val groupId = groupData.id ?: return@mapNotNull null
                         if (groupId <= 0) return@mapNotNull null
 
                         ClassRoom(
                             id = groupId,
-                            name = group.name,
-                            description = group.description ?: "",
+                            name = groupData.name,
+                            description = groupData.description ?: "",
                             backgroundImageId = R.drawable.happy_green_logo,
-                            teacherName = "ID Proprietario: ${group.ownerId}"
+                            teacherName = groupData.owner_name ?: "Proprietario: ID ${groupData.owner}",
+                            // USA I CONTATORI REALI
+                            memberCount = groupData.member_count ?: 0,
+                            postCount = groupData.post_count ?: 0
                         )
                     }
 
@@ -1396,7 +1396,7 @@ fun EnhancedClassCard(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // Icone informative in card semi-trasparenti
+                    // AGGIORNATO: Icone informative con contatori reali
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
@@ -1443,7 +1443,8 @@ fun EnhancedClassCard(
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Text(
-                                    text = "0 post", // Sarà aggiornato in futuro
+                                    // AGGIORNATO: Usa il contatore reale dei post
+                                    text = "${classRoom.postCount} post",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = Color.White
                                 )
@@ -2153,7 +2154,6 @@ fun ProfileDialog(
                     }
                 }
 
-                // Avatar
                 Box(
                     modifier = Modifier
                         .size(120.dp)
