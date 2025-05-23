@@ -42,8 +42,6 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             FrontendhappygreenTheme {
-                var showMainApp by remember { mutableStateOf(false) }
-                var showWelcome by remember { mutableStateOf(true) }
                 var currentScreen by remember { mutableStateOf<Screen>(Screen.Loading) }
                 var needsVerification by remember { mutableStateOf<Int?>(null) }
 
@@ -51,28 +49,25 @@ class MainActivity : ComponentActivity() {
                 val isLoggedIn by UserSession.isLoggedInFlow.collectAsState()
 
                 LaunchedEffect(isLoggedIn) {
-                    when {
-                        isLoggedIn -> {
-                            currentScreen = Screen.Main
-                            showWelcome = false
-                            showMainApp = true
+                    // Solo cambia schermo se l'utente è loggato
+                    if (isLoggedIn) {
+                        currentScreen = Screen.Main
 
-                            // Avvia la musica quando l'utente è loggato
-                            if (!musicStarted) {
-                                startBackgroundMusic()
-                                musicStarted = true
-                            }
+                        // Avvia la musica quando l'utente è loggato
+                        if (!musicStarted) {
+                            startBackgroundMusic()
+                            musicStarted = true
                         }
-                        else -> {
+                    } else {
+                        // Se l'utente non è loggato e siamo nella main, torna al welcome
+                        if (currentScreen == Screen.Main) {
                             currentScreen = Screen.Welcome
-                            showMainApp = false
-                            showWelcome = true
+                        }
 
-                            // Ferma la musica quando l'utente non è loggato
-                            if (musicStarted) {
-                                stopBackgroundMusic()
-                                musicStarted = false
-                            }
+                        // Ferma la musica quando l'utente non è loggato
+                        if (musicStarted) {
+                            stopBackgroundMusic()
+                            musicStarted = false
                         }
                     }
                 }
@@ -88,25 +83,23 @@ class MainActivity : ComponentActivity() {
                     }
 
                     Screen.Welcome -> {
-                        if (showWelcome) {
-                            WelcomeScreen(
-                                onGetStartedClick = {
-                                    showWelcome = false
-                                    currentScreen = Screen.Auth
-                                }
-                            )
-                        } else {
-                            AuthScreen(
-                                onAuthComplete = {
-                                    currentScreen = Screen.Main
-                                    showMainApp = true
-                                },
-                                onNeedVerification = { userId ->
-                                    needsVerification = userId
-                                    currentScreen = Screen.Verification
-                                }
-                            )
-                        }
+                        WelcomeScreen(
+                            onGetStartedClick = {
+                                currentScreen = Screen.Auth
+                            }
+                        )
+                    }
+
+                    Screen.Auth -> {
+                        AuthScreen(
+                            onAuthComplete = {
+                                currentScreen = Screen.Main
+                            },
+                            onNeedVerification = { userId ->
+                                needsVerification = userId
+                                currentScreen = Screen.Verification
+                            }
+                        )
                     }
 
                     Screen.Verification -> {
@@ -116,34 +109,27 @@ class MainActivity : ComponentActivity() {
                                 onVerificationComplete = {
                                     needsVerification = null
                                     currentScreen = Screen.Main
-                                    showMainApp = true
                                 }
                             )
                         }
                     }
 
                     Screen.Main -> {
-                        if (showMainApp) {
-                            MainScreen(
-                                volumeLevel = volumeLevel,
-                                onVolumeChange = { newVolume ->
-                                    volumeLevel = newVolume
-                                    audioController.setVolume(newVolume)
-                                },
-                                onLogout = {
-                                    // Ferma la musica al logout
-                                    stopBackgroundMusic()
-                                    musicStarted = false
+                        MainScreen(
+                            volumeLevel = volumeLevel,
+                            onVolumeChange = { newVolume ->
+                                volumeLevel = newVolume
+                                audioController.setVolume(newVolume)
+                            },
+                            onLogout = {
+                                // Ferma la musica al logout
+                                stopBackgroundMusic()
+                                musicStarted = false
 
-                                    currentScreen = Screen.Welcome
-                                    showWelcome = true
-                                    showMainApp = false
-                                }
-                            )
-                        }
+                                currentScreen = Screen.Welcome
+                            }
+                        )
                     }
-
-                    else -> {}
                 }
             }
         }
