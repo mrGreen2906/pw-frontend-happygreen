@@ -34,7 +34,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Inizializza UserSession
+        //Inizializza UserSession
         UserSession.init(this)
 
         // Inizializza AudioController
