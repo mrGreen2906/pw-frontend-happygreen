@@ -41,7 +41,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.frontend_happygreen.R
-import com.example.frontend_happygreen.data.UserSession
 import com.example.frontend_happygreen.ui.theme.Green300
 import com.example.frontend_happygreen.ui.theme.Green600
 import com.example.frontend_happygreen.ui.theme.Green800
@@ -147,7 +146,7 @@ fun WelcomeScreen(onGetStartedClick: () -> Unit) {
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = "Make our planet greener one step at a time",
+                        text = "Rendiamo il nostro pianeta più verde un passo alla volta",
                         fontSize = 16.sp,
                         color = Green600,
                         textAlign = TextAlign.Center,
