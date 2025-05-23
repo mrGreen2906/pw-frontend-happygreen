@@ -849,7 +849,7 @@ fun EcoCentersMapScreen(
     }
 }
 
-/**
+/*
  * Livelli dell'interfaccia utente
  */
 enum class UILevel {
@@ -858,16 +858,15 @@ enum class UILevel {
     MAP_WITH_DETAILS // Mappa con dettagli punto selezionato
 }
 
-/**
+/*
  * Tab per i controlli
  */
 enum class ControlsTab(val icon: ImageVector, val label: String) {
     SEARCH(Icons.Outlined.Search, "Cerca"),
     FILTER(Icons.Outlined.FilterList, "Filtri"),
-    INFO(Icons.Outlined.Info, "Info")
 }
 
-/**
+/*
  * Controlli per la visualizzazione mappa - VERSIONE COMPLETAMENTE MIGLIORATA
  */
 @Composable
@@ -1079,7 +1078,6 @@ fun MapControls(
                         searchRadius = searchRadius,
                         onRadiusChange = onRadiusChange
                     )
-                    ControlsTab.INFO -> InfoControlsImproved()
                 }
             }
         }
@@ -1248,68 +1246,6 @@ fun FilterControlsImproved(
 /**
  * Controlli info migliorati
  */
-@Composable
-fun InfoControlsImproved() {
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        item {
-            Text(
-                text = "Legenda simboli",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.Bold
-                ),
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
-
-        items(WastePointType.values()) { type ->
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = Green100.copy(alpha = 0.4f)
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = Green600,
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = type.icon,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.width(16.dp))
-
-                    Text(
-                        text = type.displayName,
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            fontWeight = FontWeight.SemiBold
-                        ),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
-        }
-    }
-}
 
 /**
  * Vista mappa con supporto per effetti

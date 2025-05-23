@@ -32,8 +32,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
@@ -114,10 +112,7 @@ import java.net.UnknownHostException
 import java.util.TimeZone
 
 /**
- * Data Models per la UI dei post con like e reactions
- */
-/**
- * Data Models per la UI dei post con like e reactions - VERSIONE CORRETTA
+ * Data Models per la UI dei post con reactions (senza like)
  */
 data class ClassPost(
     val id: String = UUID.randomUUID().toString(),
@@ -128,8 +123,6 @@ data class ClassPost(
     val imageUrl: String? = null,
     val reactions: Map<String, Int> = emptyMap(), // emoji -> count
     val comments: List<PostComment> = emptyList(),
-    val liked: Boolean = false,
-    val likeCount: Int = 0,
     val userReaction: String? = null // La reaction dell'utente corrente
 )
 
@@ -141,7 +134,7 @@ data class PostComment(
 )
 
 /**
- * ViewModel aggiornato con reset automatico e gestione like/reactions
+ * ViewModel aggiornato solo con reactions (senza like)
  */
 class ClassroomViewModel : ViewModel() {
     private val apiService = RetrofitClient.create(ApiService::class.java)
@@ -163,7 +156,6 @@ class ClassroomViewModel : ViewModel() {
 
     // ID del gruppo corrente per gestire il reset
     private var currentGroupId: Int = -1
-// In ClassroomScreen.kt - DateUtils migliorato
 
     object DateUtils {
         // Formatti per parsing delle date dal backend
@@ -319,12 +311,9 @@ class ClassroomViewModel : ViewModel() {
                                     },
                                     reactions = reactionsCounts,
                                     comments = comments,
-                                    liked = post.userLiked ?: false,
-                                    likeCount = post.likeCount ?: 0,
                                     userReaction = post.userReaction
                                 )
                             }
-
 
                         if (currentGroupId == groupId) {
                             _posts.value = processedPosts
@@ -377,9 +366,6 @@ class ClassroomViewModel : ViewModel() {
 
     /**
      * Pubblica un nuovo post NEL GRUPPO SPECIFICO
-     */
-    /**
-     * Pubblica un nuovo post NEL GRUPPO SPECIFICO - VERSIONE CORRETTA
      */
     fun addPost(groupId: Int, content: String, imageUri: Uri? = null) {
         if (groupId <= 0) {
@@ -529,60 +515,7 @@ class ClassroomViewModel : ViewModel() {
     }
 
     /**
-     * NUOVO: Toggle like per un post
-     */
-    fun toggleLike(postId: String) {
-        viewModelScope.launch {
-            try {
-                val token = UserSession.getAuthHeader() ?: return@launch
-                val postIdInt = postId.toIntOrNull() ?: return@launch
-
-                // FIX: Prima aggiorna localmente per feedback immediato
-                val currentPost = _posts.value.find { it.id == postId }
-                if (currentPost != null) {
-                    val newLiked = !currentPost.liked
-                    val newCount = if (newLiked) currentPost.likeCount + 1 else (currentPost.likeCount - 1).coerceAtLeast(0)
-
-                    val updatedPost = currentPost.copy(
-                        liked = newLiked,
-                        likeCount = newCount
-                    )
-
-                    _posts.value = _posts.value.map { if (it.id == postId) updatedPost else it }
-                }
-
-                // Poi invia la richiesta al server
-                val response = apiService.togglePostLike(postIdInt, token)
-
-                if (response.isSuccessful && response.body() != null) {
-                    val result = response.body()!!
-
-                    // Sincronizza con la risposta del server
-                    _posts.value = _posts.value.map { post ->
-                        if (post.id == postId) {
-                            post.copy(
-                                liked = result.liked,
-                                likeCount = result.likeCount
-                            )
-                        } else {
-                            post
-                        }
-                    }
-                } else {
-                    Log.e("ClassroomViewModel", "Error toggling like: ${response.code()}")
-                    // In caso di errore, ricarica i dati del gruppo
-                    loadGroupData(currentGroupId)
-                }
-            } catch (e: Exception) {
-                Log.e("ClassroomViewModel", "Error toggling like: ${e.message}", e)
-                // In caso di errore, ricarica i dati del gruppo
-                loadGroupData(currentGroupId)
-            }
-        }
-    }
-
-    /**
-     * NUOVO: Aggiungi o rimuovi reaction per un post
+     * AGGIORNATO: Aggiungi o rimuovi reaction per un post - NON ricarica più i dati
      */
     fun addReaction(postId: String, emoji: String) {
         viewModelScope.launch {
@@ -648,13 +581,11 @@ class ClassroomViewModel : ViewModel() {
                     }
                 } else {
                     Log.e("ClassroomViewModel", "Error adding reaction: ${response.code()}")
-                    // In caso di errore, ricarica i dati del gruppo
-                    loadGroupData(currentGroupId)
+                    // FIX: Non ricaricare più tutti i dati, mantieni l'aggiornamento locale
                 }
             } catch (e: Exception) {
                 Log.e("ClassroomViewModel", "Exception adding reaction: ${e.message}", e)
-                // In caso di errore, ricarica i dati del gruppo
-                loadGroupData(currentGroupId)
+                // FIX: Non ricaricare più tutti i dati, mantieni l'aggiornamento locale
             }
         }
     }
@@ -758,9 +689,6 @@ fun ClassroomScreen(
                                 post = post,
                                 onReactionClick = { emoji ->
                                     viewModel.addReaction(post.id, emoji)
-                                },
-                                onLikeClick = {
-                                    viewModel.toggleLike(post.id)
                                 },
                                 onCommentAdd = { comment ->
                                     viewModel.addComment(classRoom.id, post.id, comment)
@@ -1264,7 +1192,6 @@ fun CreatePostDialog(
 fun EnhancedClassroomPostCard(
     post: ClassPost,
     onReactionClick: (String) -> Unit,
-    onLikeClick: () -> Unit,
     onCommentAdd: (String) -> Unit
 ) {
     var showCommentInput by remember { mutableStateOf(false) }
@@ -1281,6 +1208,14 @@ fun EnhancedClassroomPostCard(
                 elevation = 4.dp,
                 shape = RoundedCornerShape(20.dp),
                 ambientColor = Color.Black.copy(alpha = 0.1f)
+            )
+            // FIX: Long press su tutto il post per le reactions
+            .combinedClickable(
+                onClick = { /* Nessuna azione sul click normale */ },
+                onLongClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    showReactionSelector = true
+                }
             ),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
@@ -1390,27 +1325,16 @@ fun EnhancedClassroomPostCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Statistiche interazioni
-            if (post.likeCount > 0 || post.comments.isNotEmpty() || post.reactions.isNotEmpty()) {
+            // FIX: Statistiche interazioni - SOLO reactions e commenti (no like)
+            if (post.comments.isNotEmpty() || post.reactions.isNotEmpty()) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Like e reactions count
+                    // Solo reactions count
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (post.likeCount > 0) {
-                            Text(
-                                text = "❤️ ${post.likeCount}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Gray600
-                            )
-                        }
-
                         if (post.reactions.isNotEmpty()) {
-                            if (post.likeCount > 0) {
-                                Text(" • ", style = MaterialTheme.typography.bodySmall, color = Gray600)
-                            }
                             post.reactions.entries.take(3).forEach { (emoji, count) ->
                                 Text(
                                     text = "$emoji $count",
@@ -1436,48 +1360,11 @@ fun EnhancedClassroomPostCard(
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
-            // Pulsanti azione migliorati con reactions
+            // FIX: Pulsante solo per commentare (no like)
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                horizontalArrangement = Arrangement.Center
             ) {
-                // Pulsante like con long press per reactions
-                Surface(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .combinedClickable(
-                            onClick = onLikeClick,
-                            onLongClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                showReactionSelector = true
-                            }
-                        )
-                        .background(
-                            color = if (post.liked) Green100.copy(alpha = 0.3f) else Color.Transparent,
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    color = Color.Transparent
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (post.liked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            contentDescription = "Mi piace",
-                            tint = if (post.liked) Color.Red else Gray600,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Text(
-                            text = "Mi piace",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = if (post.liked) Color.Red else Gray600,
-                            fontWeight = if (post.liked) FontWeight.Medium else FontWeight.Normal
-                        )
-                    }
-                }
-
                 EnhancedActionButton(
                     icon = Icons.Default.ChatBubbleOutline,
                     text = "Commenta",
