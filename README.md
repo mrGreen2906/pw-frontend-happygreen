@@ -1,6 +1,7 @@
 # HappyGreen 🌱
 
 Un ecosistema completo dedicato alla sostenibilità ambientale e all'educazione ecologica, composto da un'applicazione Android innovativa e un robusto backend API.
+Qui il [**mock-up**](https://www.canva.com/design/DAGoRb8NNhQ/1EtbcskeAjI8b5nkf87Xmg/edit?utm_content=DAGoRb8NNhQ&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton) del progetto.
 
 ## 📖 Descrizione del Progetto
 
