@@ -126,83 +126,83 @@ class EcoGameViewModel : ViewModel() {
     private val apiService = RetrofitClient.create(ApiService::class.java)
     private val wasteDatabase = listOf(
         Waste(
-            1, "Bottiglia PET 500ml", "https://sora.chatgpt.com/g/gen_01jvzhcfsjfxyte5pg61w3q8nn", 450f, 7, 10, 0.82f, 6, 3,
+            1, "Bottiglia PET 500ml", "https://videos.openai.com/vg-assets/assets%2Ftask_01jvzhcf3keaga51p8ksq5ctfk%2F1748036414_img_0.webp?st=2025-05-24T03%3A58%3A45Z&se=2025-05-30T04%3A58%3A45Z&sks=b&skt=2025-05-24T03%3A58%3A45Z&ske=2025-05-30T04%3A58%3A45Z&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skoid=aa5ddad1-c91a-4f0a-9aca-e20682cc8969&skv=2019-02-02&sv=2018-11-09&sr=b&sp=r&spr=https%2Chttp&sig=fkwsOd5MkKdgg5nrLW09Fx9dVm3Xj1AuW5zzo66yKkQ%3D&az=oaivgprodscus", 450f, 7, 10, 0.82f, 6, 3,
             "Una bottiglia di plastica PET produce 82g di CO2 durante la produzione"
         ),
         Waste(
-            2, "Sacchetto biodegradabile", "https://sora.chatgpt.com/g/gen_01jvzhe51efbrvpgxhpkwejm0j", 0.25f, 3, 7, 0.15f, 8, 2,
+            2, "Sacchetto biodegradabile", "https://videos.openai.com/vg-assets/assets%2Ftask_01jvzhe4d2e87tpgev8aam5xjf%2F1748036470_img_0.webp?st=2025-05-24T03%3A57%3A48Z&se=2025-05-30T04%3A57%3A48Z&sks=b&skt=2025-05-24T03%3A57%3A48Z&ske=2025-05-30T04%3A57%3A48Z&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skoid=aa5ddad1-c91a-4f0a-9aca-e20682cc8969&skv=2019-02-02&sv=2018-11-09&sr=b&sp=r&spr=https%2Chttp&sig=FmjH0xIulpO8axnpjm092iX64NRxYaXnQJPOvS14cpI%3D&az=oaivgprodscus", 0.25f, 3, 7, 0.15f, 8, 2,
             "I sacchetti biodegradabili necessitano di condizioni specifiche per decomporsi"
         ),
         Waste(
-            3, "Lattina alluminio 330ml", "https://sora.chatgpt.com/g/gen_01jvzhjcy1ebnr1vtggnns3phk", 80f, 5, 9, 1.7f, 9, 2,
+            3, "Lattina alluminio 330ml", "https://videos.openai.com/vg-assets/assets%2Ftask_01jvzhjc3me9qryhwd2k48bmd0%2F1748036609_img_0.webp?st=2025-05-24T03%3A59%3A35Z&se=2025-05-30T04%3A59%3A35Z&sks=b&skt=2025-05-24T03%3A59%3A35Z&ske=2025-05-30T04%3A59%3A35Z&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skoid=aa5ddad1-c91a-4f0a-9aca-e20682cc8969&skv=2019-02-02&sv=2018-11-09&sr=b&sp=r&spr=https%2Chttp&sig=SNfwHL6%2FuJMFXVA2B9SWcQ5sMzjUkki1kuB4sjGV8%2Fs%3D&az=oaivgprodscus", 80f, 5, 9, 1.7f, 9, 2,
             "Riciclare alluminio risparmia il 95% dell'energia rispetto alla produzione primaria"
         ),
         Waste(
-            4, "Buccia d'arancia", "https://sora.chatgpt.com/g/gen_01jvzhkz35f9q9068azw75fpdt", 0.17f, 1, 6, 0.01f, 10, 1,
+            4, "Buccia d'arancia", "https://videos.openai.com/vg-assets/assets%2Ftask_01jvzhkyj3exd845y5sj7hwx7v%2F1748036642_img_0.webp?st=2025-05-24T03%3A58%3A36Z&se=2025-05-30T04%3A58%3A36Z&sks=b&skt=2025-05-24T03%3A58%3A36Z&ske=2025-05-30T04%3A58%3A36Z&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skoid=aa5ddad1-c91a-4f0a-9aca-e20682cc8969&skv=2019-02-02&sv=2018-11-09&sr=b&sp=r&spr=https%2Chttp&sig=TH4mn7gDKRQN6HvUoYZyxy1tB6YsMQrYeNZ6evmLnN4%3D&az=oaivgprodscus", 0.17f, 1, 6, 0.01f, 10, 1,
             "Gli agrumi contengono oli essenziali che rallentano la decomposizione"
         ),
         Waste(
-            5, "Filtro sigaretta", "https://sora.chatgpt.com/g/gen_01jvzhnnt3eqjbmxdwg06qwpbv", 12f, 9, 10, 0.05f, 1, 8,
+            5, "Filtro sigaretta", "https://videos.openai.com/vg-assets/assets%2Ftask_01jvzhnn86f5q8nzg9aac7n57y%2F1748036715_img_0.webp?st=2025-05-24T03%3A57%3A47Z&se=2025-05-30T04%3A57%3A47Z&sks=b&skt=2025-05-24T03%3A57%3A47Z&ske=2025-05-30T04%3A57%3A47Z&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skoid=aa5ddad1-c91a-4f0a-9aca-e20682cc8969&skv=2019-02-02&sv=2018-11-09&sr=b&sp=r&spr=https%2Chttp&sig=G57RRnfXTkmt%2BXCgd4tYY67ZMF8I0A2HLjEYq7E%2B%2BUs%3D&az=oaivgprodscus", 12f, 9, 10, 0.05f, 1, 8,
             "I filtri contengono acetato di cellulosa e oltre 4000 sostanze chimiche"
         ),
         Waste(
-            6, "Pannolino usa e getta", "https://sora.chatgpt.com/g/gen_01jvzhra46ee2bsfavxhxnmrjs", 500f, 6, 8, 5.5f, 2, 4,
+            6, "Pannolino usa e getta", "https://videos.openai.com/vg-assets/assets%2Ftask_01jvzhr9dfe59vybspv3dmma3a%2F1748036803_img_0.webp?st=2025-05-24T03%3A58%3A45Z&se=2025-05-30T04%3A58%3A45Z&sks=b&skt=2025-05-24T03%3A58%3A45Z&ske=2025-05-30T04%3A58%3A45Z&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skoid=aa5ddad1-c91a-4f0a-9aca-e20682cc8969&skv=2019-02-02&sv=2018-11-09&sr=b&sp=r&spr=https%2Chttp&sig=mllzjb14M0hcSOcL6SuUb3kmam7agGUOvOon5UbZvoE%3D&az=oaivgprodscus", 500f, 6, 8, 5.5f, 2, 4,
             "Un bambino usa mediamente 6000 pannolini nei primi 3 anni di vita"
         ),
         Waste(
-            7, "Rivista patinata", "https://sora.chatgpt.com/g/gen_01jvzj0bfye52vfvnw3dwzptyz", 0.08f, 3, 6, 0.9f, 7, 2,
+            7, "Rivista patinata", "https://videos.openai.com/vg-assets/assets%2Ftask_01jvzj0atpf2n8yqwjkbn3b272%2F1748037071_img_0.webp?st=2025-05-24T03%3A59%3A03Z&se=2025-05-30T04%3A59%3A03Z&sks=b&skt=2025-05-24T03%3A59%3A03Z&ske=2025-05-30T04%3A59%3A03Z&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skoid=aa5ddad1-c91a-4f0a-9aca-e20682cc8969&skv=2019-02-02&sv=2018-11-09&sr=b&sp=r&spr=https%2Chttp&sig=Uk%2F1U%2Bz9E1Lozh5sMXVkKlQjuafqBsVQ50mp1HskkfM%3D&az=oaivgprodscus", 0.08f, 3, 6, 0.9f, 7, 2,
             "La carta patinata contiene rivestimenti che complicano il riciclaggio"
         ),
         Waste(
-            8, "Bicchiere carta plastificato", "https://sora.chatgpt.com/g/gen_01jvzjbx1we6zvbm2jgq1ncvb3", 20f, 6, 8, 0.24f, 3, 3,
+            8, "Bicchiere carta plastificato", "https://videos.openai.com/vg-assets/assets%2Ftask_01jvzjbw2qf479mxpq41gkw41z%2F1748037453_img_0.webp?st=2025-05-24T03%3A57%3A50Z&se=2025-05-30T04%3A57%3A50Z&sks=b&skt=2025-05-24T03%3A57%3A50Z&ske=2025-05-30T04%3A57%3A50Z&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skoid=aa5ddad1-c91a-4f0a-9aca-e20682cc8969&skv=2019-02-02&sv=2018-11-09&sr=b&sp=r&spr=https%2Chttp&sig=EPrd%2BJV8xSxAiYU1Of2BmPAQ7O6oXK1QxKB8uMpQ3%2Bg%3D&az=oaivgprodscus", 20f, 6, 8, 0.24f, 3, 3,
             "Il rivestimento in polietilene rende questi bicchieri difficili da riciclare"
         ),
         Waste(
-            9, "Bottiglia vetro scuro", "https://sora.chatgpt.com/g/gen_01jvzja54eezgsc6kj58kac37e", 4000f, 3, 6, 0.5f, 9, 2,
+            9, "Bottiglia vetro scuro", "https://videos.openai.com/vg-assets/assets%2Ftask_01jvzja4ebefy87a5dj9vbt9h6%2F1748037385_img_0.webp?st=2025-05-24T03%3A59%3A27Z&se=2025-05-30T04%3A59%3A27Z&sks=b&skt=2025-05-24T03%3A59%3A27Z&ske=2025-05-30T04%3A59%3A27Z&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skoid=aa5ddad1-c91a-4f0a-9aca-e20682cc8969&skv=2019-02-02&sv=2018-11-09&sr=b&sp=r&spr=https%2Chttp&sig=FbhndjshGOIN3ATMTdnTXLuk5DW73xlc0h0b4%2BscA%2FI%3D&az=oaivgprodscus", 4000f, 3, 6, 0.5f, 9, 2,
             "Il vetro scuro è infinitamente riciclabile senza perdita di qualità"
         ),
         Waste(
-            10, "Chewing gum", "https://sora.chatgpt.com/g/gen_01jvzjds56fhns63p0vm872gdq", 5f, 6, 9, 0.02f, 1, 5,
+            10, "Chewing gum", "https://videos.openai.com/vg-assets/assets%2Ftask_01jvzjdrefeqtr79dsr22seq5s%2F1748037511_img_0.webp?st=2025-05-24T03%3A58%3A03Z&se=2025-05-30T04%3A58%3A03Z&sks=b&skt=2025-05-24T03%3A58%3A03Z&ske=2025-05-30T04%3A58%3A03Z&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skoid=aa5ddad1-c91a-4f0a-9aca-e20682cc8969&skv=2019-02-02&sv=2018-11-09&sr=b&sp=r&spr=https%2Chttp&sig=rJvSXoNoMFy59DtHCqvMNpQt2tcwHTRSakQ1sWSI%2FfU%3D&az=oaivgprodscus", 5f, 6, 9, 0.02f, 1, 5,
             "La gomma da masticare è fatta di polimeri sintetici non biodegradabili"
         ),
         Waste(
-            11, "Smartphone", "https://discord.com/channels/@me/1375560507850887309", 1000f, 10, 7, 85f, 4, 9,
+            11, "Smartphone", "https://videos.openai.com/vg-assets/assets%2Ftask_01jvzjmqd0f9msqxcza5weshhg%2F1748037740_img_0.webp?st=2025-05-24T03%3A58%3A45Z&se=2025-05-30T04%3A58%3A45Z&sks=b&skt=2025-05-24T03%3A58%3A45Z&ske=2025-05-30T04%3A58%3A45Z&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skoid=aa5ddad1-c91a-4f0a-9aca-e20682cc8969&skv=2019-02-02&sv=2018-11-09&sr=b&sp=r&spr=https%2Chttp&sig=YPSDXSCwzMcevxJykVFFs4cpOfzJb3v5PIi7rh6xX5I%3D&az=oaivgprodscus", 1000f, 10, 7, 85f, 4, 9,
             "Uno smartphone contiene oltre 60 elementi della tavola periodica"
         ),
         Waste(
-            12, "Batteria litio", "https://sora.chatgpt.com/g/gen_01jvzke9daf21t38h24emvtbqx", 600f, 10, 6, 12f, 5, 10,
+            12, "Batteria litio", "https://videos.openai.com/vg-assets/assets%2Ftask_01jvzke8kpetqb9tqp99f2dbz5%2F1748038565_img_0.webp?st=2025-05-24T03%3A57%3A53Z&se=2025-05-30T04%3A57%3A53Z&sks=b&skt=2025-05-24T03%3A57%3A53Z&ske=2025-05-30T04%3A57%3A53Z&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skoid=aa5ddad1-c91a-4f0a-9aca-e20682cc8969&skv=2019-02-02&sv=2018-11-09&sr=b&sp=r&spr=https%2Chttp&sig=idqJgPs4O5%2FS%2FF0jRK3N%2FH6dc9kuyV6L99LhWHb9yyw%3D&az=oaivgprodscus", 600f, 10, 6, 12f, 5, 10,
             "Le batterie al litio rilasciano gas tossici se smaltite incorrettamente"
         ),
         Waste(
-            13, "Mascherina chirurgica", "https://sora.chatgpt.com/g/gen_01jvzjhfhse8p8j0xgmm1hyq55", 450f, 7, 9, 0.06f, 2, 4,
+            13, "Mascherina chirurgica", "https://videos.openai.com/vg-assets/assets%2Ftask_01jvzjhetpfy3bkrc1kt1ts435%2F1748037626_img_0.webp?st=2025-05-24T03%3A58%3A41Z&se=2025-05-30T04%3A58%3A41Z&sks=b&skt=2025-05-24T03%3A58%3A41Z&ske=2025-05-30T04%3A58%3A41Z&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skoid=aa5ddad1-c91a-4f0a-9aca-e20682cc8969&skv=2019-02-02&sv=2018-11-09&sr=b&sp=r&spr=https%2Chttp&sig=vokzwhNcjguuRBnOu2caMtKcGqdczDpEEAnTT%2BoRRSY%3D&az=oaivgprodscus", 450f, 7, 9, 0.06f, 2, 4,
             "Le mascherine sono fatte di polipropilene, un tipo di plastica"
         ),
         Waste(
-            14, "Capsula caffè alluminio", "https://sora.chatgpt.com/g/gen_01jvzjeh3eev0rhxn96z31kpy7", 80f, 6, 7, 0.3f, 6, 3,
+            14, "Capsula caffè alluminio", "https://videos.openai.com/vg-assets/assets%2Ftask_01jvzjefsve91t0dw2yeh0ejvs%2F1748037543_img_0.webp?st=2025-05-24T03%3A58%3A36Z&se=2025-05-30T04%3A58%3A36Z&sks=b&skt=2025-05-24T03%3A58%3A36Z&ske=2025-05-30T04%3A58%3A36Z&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skoid=aa5ddad1-c91a-4f0a-9aca-e20682cc8969&skv=2019-02-02&sv=2018-11-09&sr=b&sp=r&spr=https%2Chttp&sig=BdKnHtIHxaHVvezEkwnFgRj%2B8vdShGY7LxT%2FuGV5JCQ%3D&az=oaivgprodscus", 80f, 6, 7, 0.3f, 6, 3,
             "Le capsule miste alluminio-plastica richiedono separazione per il riciclaggio"
         ),
         Waste(
-            15, "Scontrino termico", "https://sora.chatgpt.com/g/gen_01jvzjbnj1ef29yna0ey6ras2f", 0.03f, 7, 9, 0.002f, 2, 6,
+            15, "Scontrino termico", "https://videos.openai.com/vg-assets/assets%2Ftask_01jvzjbm47f6pvmr1v5m2hqe59%2F1748037441_img_0.webp?st=2025-05-24T03%3A57%3A50Z&se=2025-05-30T04%3A57%3A50Z&sks=b&skt=2025-05-24T03%3A57%3A50Z&ske=2025-05-30T04%3A57%3A50Z&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skoid=aa5ddad1-c91a-4f0a-9aca-e20682cc8969&skv=2019-02-02&sv=2018-11-09&sr=b&sp=r&spr=https%2Chttp&sig=8KgcAuHgXiQq%2B6hrF18FclySoo0O%2BkdEdtfrVPqbfd8%3D&az=oaivgprodscus", 0.03f, 7, 9, 0.002f, 2, 6,
             "La carta termica contiene BPA, un interferente endocrino"
         ),
         Waste(
-            16, "Polistirolo imballaggio", "https://sora.chatgpt.com/g/gen_01jvzj6sqserf9bfxbk4v527zj", 500f, 8, 8, 1.8f, 2, 4,
+            16, "Polistirolo imballaggio", "https://videos.openai.com/vg-assets/assets%2Ftask_01jvzj6rm1ey2rj50txrakxjpq%2F1748037287_img_0.webp?st=2025-05-24T03%3A59%3A27Z&se=2025-05-30T04%3A59%3A27Z&sks=b&skt=2025-05-24T03%3A59%3A27Z&ske=2025-05-30T04%3A59%3A27Z&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skoid=aa5ddad1-c91a-4f0a-9aca-e20682cc8969&skv=2019-02-02&sv=2018-11-09&sr=b&sp=r&spr=https%2Chttp&sig=iUEkkHbW3CxyyAajJTJIxMkbvslF4s4wagjon%2FD%2BcDU%3D&az=oaivgprodscus", 500f, 8, 8, 1.8f, 2, 4,
             "Il polistirolo è composto al 95% da aria ma è praticamente non riciclabile"
         ),
         Waste(
-            17, "Tessuto sintetico", "https://sora.chatgpt.com/g/gen_01jvzj4rcjfr49e13qv1hgd5ke", 200f, 6, 7, 9.5f, 3, 5,
+            17, "Tessuto sintetico", "https://videos.openai.com/vg-assets/assets%2Ftask_01jvzj4qv9f1789rprpxppvyaa%2F1748037187_img_0.webp?st=2025-05-24T03%3A59%3A27Z&se=2025-05-30T04%3A59%3A27Z&sks=b&skt=2025-05-24T03%3A59%3A27Z&ske=2025-05-30T04%3A59%3A27Z&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skoid=aa5ddad1-c91a-4f0a-9aca-e20682cc8969&skv=2019-02-02&sv=2018-11-09&sr=b&sp=r&spr=https%2Chttp&sig=zkD0xcgAaEgxs%2FnAS8AdyrurRLsL20p49c8nsOEQ9hY%3D&az=oaivgprodscus", 200f, 6, 7, 9.5f, 3, 5,
             "I tessuti sintetici rilasciano microplastiche ad ogni lavaggio"
         ),
         Waste(
-            18, "Pneumatico auto", "https://sora.chatgpt.com/g/gen_01jvzhzwy2fjt9h3fb2hcmvjvq", 2000f, 8, 4, 45f, 5, 6,
+            18, "Pneumatico auto", "https://videos.openai.com/vg-assets/assets%2Ftask_01jvzhzw8ffaytdrj0geh9de0s%2F1748037055_img_0.webp?st=2025-05-24T04%3A52%3A50Z&se=2025-05-30T05%3A52%3A50Z&sks=b&skt=2025-05-24T04%3A52%3A50Z&ske=2025-05-30T05%3A52%3A50Z&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skoid=aa5ddad1-c91a-4f0a-9aca-e20682cc8969&skv=2019-02-02&sv=2018-11-09&sr=b&sp=r&spr=https%2Chttp&sig=B0r6CG3Tmp3t3gBbvJ3j6gUHkaOcpr%2F2ebwZxyp6k48%3D&az=oaivgprodscus", 2000f, 8, 4, 45f, 5, 6,
             "Un pneumatico può essere trasformato in asfalto o energia"
         ),
         Waste(
-            19, "Lampadina LED", "https://sora.chatgpt.com/g/gen_01jvzhkrk5fhza86v7966xrn7g", 25f, 4, 5, 2.1f, 7, 4,
+            19, "Lampadina LED", "https://videos.openai.com/vg-assets/assets%2Ftask_01jvzhkr5dfk5bp9e9ezxj3xwj%2F1748036656_img_0.webp?st=2025-05-24T04%3A53%3A04Z&se=2025-05-30T05%3A53%3A04Z&sks=b&skt=2025-05-24T04%3A53%3A04Z&ske=2025-05-30T05%3A53%3A04Z&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skoid=aa5ddad1-c91a-4f0a-9aca-e20682cc8969&skv=2019-02-02&sv=2018-11-09&sr=b&sp=r&spr=https%2Chttp&sig=GSN82dpcjmZ5o2NjhVS4yvck0Vt2efibtDOBtjHHhMI%3D&az=oaivgprodscus", 25f, 4, 5, 2.1f, 7, 4,
             "Le LED durano 25 volte più delle lampadine tradizionali"
         ),
         Waste(
-            20, "Cibo scaduto confezionato", "https://sora.chatgpt.com/g/gen_01jvzhfje0eb6ar4p0t488161f", 0.5f, 5, 8, 2.3f, 6, 3,
+            20, "Cibo scaduto confezionato", "https://videos.openai.com/vg-assets/assets%2Ftask_01jvzhfhbsfsysf8qfqtp4rwwa%2F1748036534_img_0.webp?st=2025-05-24T04%3A53%3A04Z&se=2025-05-30T05%3A53%3A04Z&sks=b&skt=2025-05-24T04%3A53%3A04Z&ske=2025-05-30T05%3A53%3A04Z&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skoid=aa5ddad1-c91a-4f0a-9aca-e20682cc8969&skv=2019-02-02&sv=2018-11-09&sr=b&sp=r&spr=https%2Chttp&sig=i9po5OmY9QtX8nYemw2aRu37ncpQnkjIG3aNQasMQ%2Fc%3D&az=oaivgprodscus", 0.5f, 5, 8, 2.3f, 6, 3,
             "Il 30% del cibo prodotto nel mondo viene sprecato"
         )
     )
@@ -738,21 +738,6 @@ fun EnhancedTopBar(
                         fontSize = 18.sp
                     )
                 }
-
-                // Livello con badge
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = EcoDarkGreen
-                ) {
-                    Text(
-                        text = "LV.$currentLevel",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-                    )
-                }
-
-                // Record
                 Text(
                     text = "Record: $highScore",
                     color = Color.White,
@@ -977,7 +962,7 @@ fun EnhancedWasteCard(
                         contentAlignment = Alignment.Center
                     ) {
                         AsyncImage(
-                            model = it.name,
+                            model = it.imageUrl,
                             contentDescription = it.name,
                             contentScale = ContentScale.Fit,
                             modifier = Modifier

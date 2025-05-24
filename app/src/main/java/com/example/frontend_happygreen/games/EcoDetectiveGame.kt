@@ -1,14 +1,10 @@
 package com.example.frontend_happygreen.games
 
 import android.util.Log
-import androidx.compose.animation.AnimatedVisibility as ComposeAnimatedVisibility
 import androidx.compose.animation.core.*
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -34,9 +30,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.example.frontend_happygreen.R
 import com.example.frontend_happygreen.data.UserSession
-import com.example.frontend_happygreen.ui.components.HappyGreenButton
 import com.example.frontend_happygreen.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -63,7 +59,7 @@ enum class WasteType(val colorCode: Color, val displayName: String, val icon: an
 data class WasteItem(
     val id: Int,
     val name: String,
-    val imageRes: Int,
+    val imageRes: String,
     val type: WasteType,
     val description: String,
     val educationalFact: String
@@ -78,7 +74,7 @@ class EcoDetectiveViewModel : ViewModel() {
         WasteItem(
             id = 1,
             name = "Bottiglia di plastica",
-            imageRes = R.drawable.happy_green_logo,
+            imageRes = "https://videos.openai.com/vg-assets/assets%2Ftask_01jw0dt3nceq3byhy7n4fwasp8%2F1748066250_img_0.webp?st=2025-05-24T04%3A52%3A48Z&se=2025-05-30T05%3A52%3A48Z&sks=b&skt=2025-05-24T04%3A52%3A48Z&ske=2025-05-30T05%3A52%3A48Z&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skoid=aa5ddad1-c91a-4f0a-9aca-e20682cc8969&skv=2019-02-02&sv=2018-11-09&sr=b&sp=r&spr=https%2Chttp&sig=Xk2jQS44485%2Bv20CoTxd49g19klx%2ByjPB1Nw4La6qbI%3D&az=oaivgprodscus",
             type = WasteType.PLASTIC,
             description = "Le bottiglie di plastica impiegano fino a 450 anni per decomporsi",
             educationalFact = "Una bottiglia di plastica PET produce 82g di CO2 durante la produzione"
@@ -86,7 +82,7 @@ class EcoDetectiveViewModel : ViewModel() {
         WasteItem(
             id = 2,
             name = "Giornale",
-            imageRes = R.drawable.happy_green_logo,
+            imageRes = "https://videos.openai.com/vg-assets/assets%2Ftask_01jw0e0a23f3wbx1w7q313yvfc%2F1748066410_img_0.webp?st=2025-05-24T04%3A52%3A44Z&se=2025-05-30T05%3A52%3A44Z&sks=b&skt=2025-05-24T04%3A52%3A44Z&ske=2025-05-30T05%3A52%3A44Z&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skoid=aa5ddad1-c91a-4f0a-9aca-e20682cc8969&skv=2019-02-02&sv=2018-11-09&sr=b&sp=r&spr=https%2Chttp&sig=7%2FhHG0Uq76Ww5EFMwW6%2BBlNMHh5cacA1TTfUqChNFZk%3D&az=oaivgprodscus",
             type = WasteType.PAPER,
             description = "La carta si decompone in circa 2-5 mesi se correttamente smaltita",
             educationalFact = "Riciclare una tonnellata di carta salva 17 alberi"
@@ -94,7 +90,7 @@ class EcoDetectiveViewModel : ViewModel() {
         WasteItem(
             id = 3,
             name = "Buccia di banana",
-            imageRes = R.drawable.happy_green_logo,
+            imageRes = "https://videos.openai.com/vg-assets/assets%2Ftask_01jw0e2fd9fyramryqa07efrnb%2F1748066490_img_0.webp?st=2025-05-24T04%3A52%3A48Z&se=2025-05-30T05%3A52%3A48Z&sks=b&skt=2025-05-24T04%3A52%3A48Z&ske=2025-05-30T05%3A52%3A48Z&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skoid=aa5ddad1-c91a-4f0a-9aca-e20682cc8969&skv=2019-02-02&sv=2018-11-09&sr=b&sp=r&spr=https%2Chttp&sig=Ut9tmIyvCmVqycxo8zzGTslF2tQOJIOYCsXmmtIk%2Bls%3D&az=oaivgprodscus",
             type = WasteType.ORGANIC,
             description = "Gli scarti organici si decompongono in poche settimane in compost",
             educationalFact = "Il compost domestico riduce i rifiuti del 30%"
@@ -102,7 +98,7 @@ class EcoDetectiveViewModel : ViewModel() {
         WasteItem(
             id = 4,
             name = "Bottiglia di vetro",
-            imageRes = R.drawable.happy_green_logo,
+            imageRes = "https://videos.openai.com/vg-assets/assets%2Ftask_01jw0e54w2e6q9ms4acta9jzgv%2F1748066564_img_0.webp?st=2025-05-24T04%3A54%3A35Z&se=2025-05-30T05%3A54%3A35Z&sks=b&skt=2025-05-24T04%3A54%3A35Z&ske=2025-05-30T05%3A54%3A35Z&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skoid=aa5ddad1-c91a-4f0a-9aca-e20682cc8969&skv=2019-02-02&sv=2018-11-09&sr=b&sp=r&spr=https%2Chttp&sig=uxqwmOEIPPDi57BlqneDtiMv8ceJQSJmFrTk4EHyEmA%3D&az=oaivgprodscus",
             type = WasteType.GLASS,
             description = "Il vetro può impiegare oltre 4000 anni per decomporsi naturalmente",
             educationalFact = "Il vetro è riciclabile infinite volte senza perdere qualità"
@@ -110,7 +106,7 @@ class EcoDetectiveViewModel : ViewModel() {
         WasteItem(
             id = 5,
             name = "Sacchetto di plastica",
-            imageRes = R.drawable.happy_green_logo,
+            imageRes = "https://videos.openai.com/vg-assets/assets%2Ftask_01jvzhe4d2e87tpgev8aam5xjf%2F1748036470_img_0.webp?st=2025-05-24T03%3A57%3A48Z&se=2025-05-30T04%3A57%3A48Z&sks=b&skt=2025-05-24T03%3A57%3A48Z&ske=2025-05-30T04%3A57%3A48Z&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skoid=aa5ddad1-c91a-4f0a-9aca-e20682cc8969&skv=2019-02-02&sv=2018-11-09&sr=b&sp=r&spr=https%2Chttp&sig=FmjH0xIulpO8axnpjm092iX64NRxYaXnQJPOvS14cpI%3D&az=oaivgprodscus",
             type = WasteType.PLASTIC,
             description = "I sacchetti di plastica impiegano fino a 20 anni per decomporsi",
             educationalFact = "Ogni anno finiscono negli oceani 8 milioni di tonnellate di plastica"
@@ -118,7 +114,7 @@ class EcoDetectiveViewModel : ViewModel() {
         WasteItem(
             id = 6,
             name = "Cartone del latte",
-            imageRes = R.drawable.happy_green_logo,
+            imageRes = "https://videos.openai.com/vg-assets/assets%2Ftask_01jw0e8dfaf4msbrnw9w1vzsp5%2F1748066667_img_0.webp?st=2025-05-24T04%3A53%3A45Z&se=2025-05-30T05%3A53%3A45Z&sks=b&skt=2025-05-24T04%3A53%3A45Z&ske=2025-05-30T05%3A53%3A45Z&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skoid=aa5ddad1-c91a-4f0a-9aca-e20682cc8969&skv=2019-02-02&sv=2018-11-09&sr=b&sp=r&spr=https%2Chttp&sig=ZCYdy2lnGhhAUnmxcJSg1i9p6DhuuFO7Tq1FgcWWU2w%3D&az=oaivgprodscus",
             type = WasteType.PAPER,
             description = "I contenitori Tetra Pak sono riciclabili nella carta",
             educationalFact = "I Tetra Pak sono composti per il 75% da carta riciclabile"
@@ -126,7 +122,7 @@ class EcoDetectiveViewModel : ViewModel() {
         WasteItem(
             id = 7,
             name = "Avanzi di cibo",
-            imageRes = R.drawable.happy_green_logo,
+            imageRes = "https://videos.openai.com/vg-assets/assets%2Ftask_01jvzhkyj3exd845y5sj7hwx7v%2F1748036642_img_0.webp?st=2025-05-24T03%3A58%3A36Z&se=2025-05-30T04%3A58%3A36Z&sks=b&skt=2025-05-24T03%3A58%3A36Z&ske=2025-05-30T04%3A58%3A36Z&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skoid=aa5ddad1-c91a-4f0a-9aca-e20682cc8969&skv=2019-02-02&sv=2018-11-09&sr=b&sp=r&spr=https%2Chttp&sig=TH4mn7gDKRQN6HvUoYZyxy1tB6YsMQrYeNZ6evmLnN4%3D&az=oaivgprodscus",
             type = WasteType.ORGANIC,
             description = "Gli avanzi di cibo possono diventare compost per le piante",
             educationalFact = "Il 30% del cibo prodotto nel mondo viene sprecato"
@@ -134,7 +130,7 @@ class EcoDetectiveViewModel : ViewModel() {
         WasteItem(
             id = 8,
             name = "Barattolo di vetro",
-            imageRes = R.drawable.happy_green_logo,
+            imageRes = "https://videos.openai.com/vg-assets/assets%2Ftask_01jw0ebrrqe9frd0qzfb0epc77%2F1748066776_img_0.webp?st=2025-05-24T04%3A53%3A36Z&se=2025-05-30T05%3A53%3A36Z&sks=b&skt=2025-05-24T04%3A53%3A36Z&ske=2025-05-30T05%3A53%3A36Z&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skoid=aa5ddad1-c91a-4f0a-9aca-e20682cc8969&skv=2019-02-02&sv=2018-11-09&sr=b&sp=r&spr=https%2Chttp&sig=IxdH6eaalJf1H1vpX0p9AaP6RSV1RNsu7X4oFGz6VuY%3D&az=oaivgprodscus",
             type = WasteType.GLASS,
             description = "Il vetro è riciclabile infinite volte senza perdere qualità",
             educationalFact = "Riciclare vetro consuma il 40% meno energia della produzione da materie prime"
@@ -462,18 +458,6 @@ fun EnhancedGameHeader(
                     )
                 }
 
-                // Livello con badge
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = EcoDarkGreen
-                ) {
-                    Text(
-                        text = "LV.$currentLevel",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-                    )
-                }
 
                 // Vite rimanenti
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -652,14 +636,15 @@ fun EnhancedWasteItemCard(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Image(
-                            painter = painterResource(id = wasteItem.imageRes),
+                        AsyncImage(
+                            model = wasteItem.imageRes, // ✅ AsyncImage accetta String URL
                             contentDescription = wasteItem.name,
                             contentScale = ContentScale.Fit,
                             modifier = Modifier
                                 .size(120.dp)
                                 .padding(8.dp)
                         )
+
                     }
                 }
 
